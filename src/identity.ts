@@ -7,6 +7,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { sha512 } from "@noble/hashes/sha512";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import { Identity } from "./types";
 
 const ULA_PREFIX = Buffer.from("fd00deadbeef0000", "hex");
@@ -81,12 +82,6 @@ export function loadOrCreateIdentity(dataDir: string): Identity {
 /** Sign a canonical message dict with the private key. Returns base64 signature. */
 export function signMessage(privateKeyB64: string, data: Record<string, unknown>): string {
   const privBytes = Buffer.from(privateKeyB64, "base64");
-  const pubBytes = Buffer.from(
-    Buffer.from(privBytes).toString("hex") // just to get length check
-  );
-
-  // nacl expects 64-byte secret key = priv(32) + pub(32)
-  // We stored only priv(32), so we need to reconstruct
   const privFull = nacl.sign.keyPair.fromSeed(privBytes);
   const msg = Buffer.from(JSON.stringify(data, Object.keys(data).sort()));
   const sig = nacl.sign.detached(msg, privFull.secretKey);
@@ -113,4 +108,26 @@ export function verifySignature(
 export function agentIdFromPublicKey(publicKeyB64: string): string {
   const pubBytes = Buffer.from(publicKeyB64, "base64");
   return Buffer.from(sha256(pubBytes)).toString("hex").slice(0, 16);
+}
+
+/**
+ * Get the first non-loopback, non-link-local IPv6 address from network interfaces.
+ * Used in test/Docker mode where the actual container IPv6 is used instead of
+ * a derived Yggdrasil address.
+ */
+export function getActualIpv6(): string | null {
+  const ifaces = os.networkInterfaces();
+  for (const iface of Object.values(ifaces)) {
+    if (!iface) continue;
+    for (const info of iface) {
+      if (
+        info.family === "IPv6" &&
+        !info.internal &&
+        !info.address.startsWith("fe80:")
+      ) {
+        return info.address;
+      }
+    }
+  }
+  return null;
 }

@@ -3,22 +3,6 @@
   "name": "IPv6 P2P",
   "description": "Direct encrypted P2P communication between OpenClaw instances via Yggdrasil IPv6",
   "version": "0.1.0",
-  "openclaw": {
-    "extensions": ["./dist/index.js"],
-    "channel": {
-      "id": "ipv6-p2p",
-      "label": "IPv6 P2P",
-      "selectionLabel": "IPv6 P2P (Yggdrasil)",
-      "docsPath": "/channels/ipv6-p2p",
-      "blurb": "Direct encrypted P2P messaging via Yggdrasil IPv6. No servers, no middlemen.",
-      "order": 90,
-      "aliases": ["p2p", "ygg", "yggdrasil"]
-    },
-    "install": {
-      "npmSpec": "@resciencelab/openclaw-ipv6-p2p",
-      "defaultChoice": "npm"
-    }
-  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -36,12 +20,18 @@
         "type": "array",
         "items": { "type": "string" },
         "description": "Additional Yggdrasil bootstrap peers"
+      },
+      "test_mode": {
+        "type": "boolean",
+        "default": false,
+        "description": "Skip Yggdrasil IP validation (for local/Docker testing without Yggdrasil daemon)"
       }
     }
   },
   "uiHints": {
     "peer_port": { "label": "Peer Server Port", "placeholder": "8099" },
     "data_dir": { "label": "Data Directory" },
-    "yggdrasil_peers": { "label": "Extra Yggdrasil Peers" }
+    "yggdrasil_peers": { "label": "Extra Yggdrasil Peers" },
+    "test_mode": { "label": "Test Mode (no Yggdrasil)" }
   }
 }

@@ -16,7 +16,7 @@
  */
 import * as os from "os";
 import * as path from "path";
-import { loadOrCreateIdentity } from "./identity";
+import { loadOrCreateIdentity, getActualIpv6 } from "./identity";
 import { startYggdrasil, stopYggdrasil, isYggdrasilAvailable } from "./yggdrasil";
 import { initDb, listPeers, upsertPeer, removePeer, getPeer } from "./peer-db";
 import { startPeerServer, stopPeerServer, getInbox } from "./peer-server";
@@ -39,6 +39,7 @@ export default function register(api: any) {
       dataDir = cfg.data_dir ?? dataDir;
       peerPort = cfg.peer_port ?? peerPort;
       const extraPeers: string[] = cfg.yggdrasil_peers ?? [];
+      const testMode = cfg.test_mode ?? false;
 
       // Load or create Ed25519 identity
       identity = loadOrCreateIdentity(dataDir);
@@ -46,23 +47,33 @@ export default function register(api: any) {
 
       console.log(`[p2p] Agent ID:  ${identity.agentId}`);
       console.log(`[p2p] CGA IPv6:  ${identity.cgaIpv6}`);
-      console.log(`[p2p] Ygg (est): ${identity.yggIpv6} (derived, before daemon starts)`);
 
-      // Start Yggdrasil daemon (best-effort)
-      if (isYggdrasilAvailable()) {
-        yggInfo = await startYggdrasil(dataDir, extraPeers);
-        if (yggInfo) {
-          // Update identity with real Yggdrasil address from daemon
-          identity.yggIpv6 = yggInfo.address;
-          console.log(`[p2p] Yggdrasil: ${yggInfo.address}  (subnet: ${yggInfo.subnet})`);
+      if (testMode) {
+        const actualIpv6 = getActualIpv6();
+        if (actualIpv6) {
+          identity.yggIpv6 = actualIpv6;
+          console.log(`[p2p] Test mode: using actual IPv6 ${actualIpv6}`);
+        } else {
+          console.log(`[p2p] Ygg (derived): ${identity.yggIpv6}`);
         }
       } else {
-        console.warn("[p2p] yggdrasil not installed — run without Yggdrasil (local network only)");
-        console.warn("[p2p] Install: https://yggdrasil-network.github.io/installation.html");
+        console.log(`[p2p] Ygg (est): ${identity.yggIpv6} (derived, before daemon starts)`);
+
+        // Start Yggdrasil daemon (best-effort)
+        if (isYggdrasilAvailable()) {
+          yggInfo = await startYggdrasil(dataDir, extraPeers);
+          if (yggInfo) {
+            identity.yggIpv6 = yggInfo.address;
+            console.log(`[p2p] Yggdrasil: ${yggInfo.address}  (subnet: ${yggInfo.subnet})`);
+          }
+        } else {
+          console.warn("[p2p] yggdrasil not installed — run without Yggdrasil (local network only)");
+          console.warn("[p2p] Install: https://yggdrasil-network.github.io/installation.html");
+        }
       }
 
       // Start peer HTTP server
-      await startPeerServer(peerPort);
+      await startPeerServer(peerPort, { testMode });
 
       // Wire incoming messages to OpenClaw gateway
       wireInboundToGateway(api);

@@ -33,4 +33,5 @@ export interface PluginConfig {
   peer_port?: number;
   data_dir?: string;
   yggdrasil_peers?: string[];
+  test_mode?: boolean;
 }

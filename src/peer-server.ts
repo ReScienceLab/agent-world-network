@@ -42,7 +42,11 @@ function isYggdrasilAddr(addr: string): boolean {
   return /^02[0-9a-f]{2}:/i.test(clean);
 }
 
-export async function startPeerServer(port: number = 8099): Promise<void> {
+export async function startPeerServer(
+  port: number = 8099,
+  opts: { testMode?: boolean } = {}
+): Promise<void> {
+  const testMode = opts.testMode ?? false;
   server = Fastify({ logger: false });
 
   server.get("/peer/ping", async () => ({ ok: true, ts: Date.now() }));
@@ -53,17 +57,19 @@ export async function startPeerServer(port: number = 8099): Promise<void> {
     const msg = req.body;
     const srcIp = req.socket.remoteAddress ?? "";
 
-    // Step 1: Verify source is Yggdrasil
-    if (!isYggdrasilAddr(srcIp)) {
-      return reply.code(403).send({ error: "Source is not a Yggdrasil address (200::/8 required)" });
-    }
+    if (!testMode) {
+      // Step 1: Verify source is Yggdrasil
+      if (!isYggdrasilAddr(srcIp)) {
+        return reply.code(403).send({ error: "Source is not a Yggdrasil address (200::/8 required)" });
+      }
 
-    // Step 2: from_ygg must match TCP source IP
-    const normalizedSrc = srcIp.replace(/^::ffff:/, "");
-    if (msg.fromYgg !== normalizedSrc) {
-      return reply.code(403).send({
-        error: `from_ygg ${msg.fromYgg} does not match TCP source ${normalizedSrc}`,
-      });
+      // Step 2: from_ygg must match TCP source IP
+      const normalizedSrc = srcIp.replace(/^::ffff:/, "");
+      if (msg.fromYgg !== normalizedSrc) {
+        return reply.code(403).send({
+          error: `from_ygg ${msg.fromYgg} does not match TCP source ${normalizedSrc}`,
+        });
+      }
     }
 
     // Step 3: Ed25519 signature
@@ -91,7 +97,7 @@ export async function startPeerServer(port: number = 8099): Promise<void> {
   });
 
   await server.listen({ port, host: "::" });
-  console.log(`[p2p] Peer server listening on [::]:${port}`);
+  console.log(`[p2p] Peer server listening on [::]:${port}${testMode ? " (test mode)" : ""}`);
 }
 
 export async function stopPeerServer(): Promise<void> {
