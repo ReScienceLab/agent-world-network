@@ -251,4 +251,108 @@ export default function register(api: any) {
       return { text: `**Known Peers**\n${lines.join("\n")}` };
     },
   });
+
+  // ── 5. Agent tools (LLM-callable) ─────────────────────────────────────────
+  api.registerTool({
+    name: "p2p_add_peer",
+    description:
+      "Add a remote OpenClaw agent as a P2P peer using their Yggdrasil or ULA IPv6 address. " +
+      "Call this when the user provides another agent's IPv6 address and wants to communicate with them.",
+    parameters: {
+      type: "object",
+      properties: {
+        ygg_addr: {
+          type: "string",
+          description: "The peer's Yggdrasil or ULA IPv6 address (e.g. fd77:1234::b or 200:1234::1)",
+        },
+        alias: {
+          type: "string",
+          description: "Optional human-readable name for this peer (e.g. 'Alice')",
+        },
+      },
+      required: ["ygg_addr"],
+    },
+    async execute(_id: string, params: { ygg_addr: string; alias?: string }) {
+      upsertPeer(params.ygg_addr, params.alias ?? "");
+      const label = params.alias ? ` (${params.alias})` : "";
+      return {
+        content: [{ type: "text", text: `Peer added: ${params.ygg_addr}${label}` }],
+      };
+    },
+  });
+
+  api.registerTool({
+    name: "p2p_send_message",
+    description:
+      "Send a direct encrypted P2P message to a known peer's agent. " +
+      "Use this when the user wants to send a message to another OpenClaw agent by their IPv6 address or alias. " +
+      "The message is signed with Ed25519 and delivered over IPv6 without any central server.",
+    parameters: {
+      type: "object",
+      properties: {
+        ygg_addr: {
+          type: "string",
+          description: "The recipient peer's Yggdrasil or ULA IPv6 address",
+        },
+        message: {
+          type: "string",
+          description: "The message content to send",
+        },
+      },
+      required: ["ygg_addr", "message"],
+    },
+    async execute(_id: string, params: { ygg_addr: string; message: string }) {
+      if (!identity) {
+        return { content: [{ type: "text", text: "Error: P2P service not started yet." }] };
+      }
+      const result = await sendP2PMessage(identity, params.ygg_addr, "chat", params.message, peerPort);
+      if (result.ok) {
+        return {
+          content: [{ type: "text", text: `Message delivered to ${params.ygg_addr}` }],
+        };
+      }
+      return {
+        content: [{ type: "text", text: `Failed to deliver message: ${result.error}` }],
+        isError: true,
+      };
+    },
+  });
+
+  api.registerTool({
+    name: "p2p_list_peers",
+    description: "List all known P2P peers this agent has communicated with or added manually.",
+    parameters: { type: "object", properties: {}, required: [] },
+    async execute(_id: string, _params: Record<string, never>) {
+      const peers = listPeers();
+      if (peers.length === 0) {
+        return { content: [{ type: "text", text: "No peers yet." }] };
+      }
+      const lines = peers.map((p) => {
+        const ago = Math.round((Date.now() - p.lastSeen) / 1000);
+        return `• ${p.yggAddr}${p.alias ? ` (${p.alias})` : ""} — last seen ${ago}s ago`;
+      });
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    },
+  });
+
+  api.registerTool({
+    name: "p2p_status",
+    description: "Get this node's own Yggdrasil IPv6 address and P2P service status. " +
+      "Share this address with other users so they can reach this agent.",
+    parameters: { type: "object", properties: {}, required: [] },
+    async execute(_id: string, _params: Record<string, never>) {
+      if (!identity) {
+        return { content: [{ type: "text", text: "P2P service not started." }] };
+      }
+      const addr = yggInfo?.address ?? identity.yggIpv6;
+      const peers = listPeers();
+      const inbox = getInbox();
+      const lines = [
+        `This agent's P2P address: ${addr}`,
+        `Known peers: ${peers.length}`,
+        `Unread inbox: ${inbox.length} messages`,
+      ];
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    },
+  });
 }
