@@ -74,10 +74,11 @@ export async function startPeerServer(
     }
 
     // Verify signature over announcement fields (excluding signature itself)
-    const { signature, peers: _peers, ...signable } = ann;
+    const { signature, ...signable } = ann;
     if (!verifySignature(ann.publicKey, signable as Record<string, unknown>, signature)) {
       return reply.code(403).send({ error: "Invalid announcement signature" });
     }
+    const _peers = ann.peers;
 
     // TOFU: record the announcer
     upsertDiscoveredPeer(ann.fromYgg, ann.publicKey, {

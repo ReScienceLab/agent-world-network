@@ -87,6 +87,7 @@ export default function register(api: any) {
       // DHT peer discovery — delay startup to let Yggdrasil routes converge
       const startupDelayMs = cfg.startup_delay_ms ?? 30_000;
       setTimeout(async () => {
+        console.log(`[p2p:discovery] Starting bootstrap — identity.yggIpv6: ${identity?.yggIpv6}`);
         await bootstrapDiscovery(identity!, peerPort, bootstrapPeers);
         startDiscoveryLoop(identity!, peerPort, discoveryIntervalMs);
       }, startupDelayMs);

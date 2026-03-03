@@ -27,7 +27,7 @@ export const DEFAULT_BOOTSTRAP_PEERS: string[] = [
   "200:697f:bda:1e8e:706a:6c5e:630b:51d", // bootstrap node (us-east-2, t3.medium)
 ];
 
-const EXCHANGE_TIMEOUT_MS = 8_000;
+const EXCHANGE_TIMEOUT_MS = 30_000;
 const MAX_FANOUT_PEERS = 5;   // how many newly-discovered peers to also announce to
 const MAX_SHARED_PEERS = 20;  // max peers we share in one exchange
 
@@ -82,11 +82,16 @@ export async function announceToNode(
 
     clearTimeout(timer);
 
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "");
+      console.warn(`[p2p:discovery] Announce to ${targetYggAddr.slice(0,20)}... rejected ${resp.status}: ${errText}`);
+      return null;
+    }
 
     const body = await resp.json() as { ok: boolean; peers?: any[] };
     return body.peers ?? null;
-  } catch {
+  } catch (err: any) {
+    console.warn(`[p2p:discovery] Announce to ${targetYggAddr.slice(0,20)}... error: ${err?.message}`);
     return null;
   }
 }

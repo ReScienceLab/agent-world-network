@@ -82,7 +82,8 @@ function verifySignature(publicKeyB64, obj, signatureB64) {
   try {
     const pubKey = Buffer.from(publicKeyB64, "base64");
     const sig = Buffer.from(signatureB64, "base64");
-    const msg = Buffer.from(JSON.stringify(obj));
+    // Must match signMessage in identity.ts: keys sorted alphabetically
+    const msg = Buffer.from(JSON.stringify(obj, Object.keys(obj).sort()));
     return nacl.sign.detached.verify(msg, sig, pubKey);
   } catch {
     return false;
@@ -135,10 +136,11 @@ server.post("/peer/announce", async (req, reply) => {
     }
   }
 
-  const { signature, peers: sharedPeers, ...signable } = ann;
+  const { signature, ...signable } = ann;
   if (!verifySignature(ann.publicKey, signable, signature)) {
     return reply.code(403).send({ error: "Invalid Ed25519 signature" });
   }
+  const sharedPeers = ann.peers;
 
   upsertPeer(ann.fromYgg, ann.publicKey, {
     alias: ann.alias,
