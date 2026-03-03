@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-03-03
+
+### Added
+
+- Auto-detect Yggdrasil for `test_mode`: tri-state `"auto"` (default) detects external daemon automatically.
+- Auto-inject public peers into system Yggdrasil when only LAN/multicast peers are present.
+- Enriched `yggdrasil_check` tool with peer count and routing table size.
+- Factory hooks for session management and command safety checks.
+- `AGENTS.md` for AI coding agent context, including release process documentation.
+- `CHANGELOG.md` for tracking project changes.
+
+### Changed
+
+- Parallelized bootstrap node connections (worst-case 150s → 30s).
+- Debounced peer-db disk writes during discovery (1s coalescing).
+- Added `os` and `requires.bins` to skill frontmatter for ClawHub security scan.
+
+### Fixed
+
+- Omit `undefined` alias field from announce payload to prevent canonicalization mismatches.
+
 ## [0.2.0] - 2026-03-03
 
 ### Breaking Changes
