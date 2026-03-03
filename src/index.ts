@@ -20,7 +20,7 @@ import { loadOrCreateIdentity, getActualIpv6 } from "./identity";
 import { startYggdrasil, stopYggdrasil, isYggdrasilAvailable, detectExternalYggdrasil, getYggdrasilNetworkInfo } from "./yggdrasil";
 import { initDb, listPeers, upsertPeer, removePeer, getPeer, flushDb } from "./peer-db";
 import { startPeerServer, stopPeerServer, getInbox } from "./peer-server";
-import { sendP2PMessage, pingPeer } from "./peer-client";
+import { sendP2PMessage, pingPeer, broadcastLeave } from "./peer-client";
 import { bootstrapDiscovery, startDiscoveryLoop, stopDiscoveryLoop, DEFAULT_BOOTSTRAP_PEERS } from "./peer-discovery";
 import { upsertDiscoveredPeer } from "./peer-db";
 import { buildChannel, wireInboundToGateway } from "./channel";
@@ -110,6 +110,10 @@ export default function register(api: any) {
         _startupTimer = null;
       }
       stopDiscoveryLoop();
+      // Broadcast signed leave tombstone to all known peers before shutting down
+      if (identity) {
+        await broadcastLeave(identity, listPeers(), peerPort);
+      }
       flushDb();
       await stopPeerServer();
       stopYggdrasil();
