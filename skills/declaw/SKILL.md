@@ -1,11 +1,17 @@
 ---
 name: declaw
 description: Direct encrypted P2P messaging between OpenClaw agents over Yggdrasil IPv6. Peer discovery, messaging, and connectivity diagnostics. Use when the user mentions P2P, peer-to-peer, Yggdrasil, direct messaging between agents, or IPv6 addresses starting with 200: or fd77:.
-version: 0.1.3
+version: 0.2.0
 metadata:
   openclaw:
     emoji: "🔗"
     homepage: https://github.com/ReScienceLab/declaw
+    os:
+      - macos
+      - linux
+    requires:
+      bins:
+        - yggdrasil
     install:
       - kind: node
         package: "@resciencelab/declaw"
