@@ -1,0 +1,14 @@
+{
+  "name": "declaw-bootstrap",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "DeClaw standalone bootstrap peer exchange server",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "fastify": "^4.26.2",
+    "tweetnacl": "^1.0.3"
+  }
+}
