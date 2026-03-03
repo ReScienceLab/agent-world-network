@@ -92,8 +92,36 @@ All runtime config is in `openclaw.json` under `plugins.entries.declaw.config`:
 - Branch from `main`: `feature/<slug>`, `fix/<slug>`
 - Commit prefixes: `feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `chore:`, `test:`
 - Breaking changes: `feat!:` with `BREAKING CHANGE:` footer (0.x phase — breaking changes expected)
-- Version bumps: `npm version patch|minor|major` → push tag → GitHub release → npm publish
 - Never force-push `main`
+
+## Release Process
+
+### Version Bump & npm Publish
+1. Ensure all changes committed and tests pass: `npm run build && node --test test/*.test.mjs`
+2. Bump version: `npm version patch|minor|major` (creates git tag `vX.Y.Z`)
+3. Push with tags: `git push origin main --tags`
+4. Create GitHub release for the tag: `gh release create vX.Y.Z --generate-notes`
+5. GitHub Actions (`.github/workflows/publish.yml`) auto-publishes to npm on release
+
+### ClawHub Skill Publish
+- Verify login: `npx clawhub@latest whoami`
+- Publish: `npx clawhub@latest publish skills/declaw`
+- Skill version in `SKILL.md` frontmatter must match `package.json` version
+
+### Bootstrap Node Deployment
+- Only needed when `bootstrap/server.mjs` changes (client-side optimizations skip this)
+- Deploy via AWS SSM (no SSH): `base64 -i bootstrap/server.mjs` → SSM send-command to all 5 instances → restart systemd
+- Verify each node: `curl -s http://[node-ygg-addr]:8099/health`
+
+### Changelog
+- Update `CHANGELOG.md` before tagging — follows Keep a Changelog format
+- Sections: `Breaking Changes`, `Added`, `Changed`, `Fixed`
+
+### Versioning
+Semantic versioning: `vMAJOR.MINOR.PATCH`
+- MAJOR: Breaking changes (in 0.x phase, MINOR covers breaking changes)
+- MINOR: New features
+- PATCH: Bug fixes
 
 ## Security
 
@@ -102,16 +130,3 @@ All runtime config is in `openclaw.json` under `plugins.entries.declaw.config`:
 - TOFU key mismatch returns 403 with explicit error (possible key rotation)
 - Yggdrasil admin socket (`/var/run/yggdrasil.sock`) requires appropriate permissions
 - Plugin spawning Yggdrasil needs root for TUN device — prefer system daemon
-
-## Gotchas
-
-- Tests import `dist/` not `src/` — stale builds cause phantom failures
-- Plugin spawns its own Yggdrasil if no system daemon detected; this fails without root (TUN permission). The plugin now auto-detects external daemons via admin socket.
-- `alias: undefined` in JSON payloads causes canonicalization mismatches across nodes — always omit the field instead of setting to undefined
-- `docs/bootstrap.json` is published via GitHub Pages — update it when adding/removing bootstrap nodes (plugin fetches this at startup)
-- The `openclaw.json` config `test_mode: true` silently disables all Yggdrasil integration — now defaults to `"auto"` to prevent this footgun
-- Bootstrap discovery runs 30s after startup to let Yggdrasil routes converge; when reusing an external daemon, routes are already converged but the delay still applies
-
-## Archived Knowledge
-
-Before debugging or repeating past work, consult `.archive/MEMORY.md` for deployment history, bug fixes, and infrastructure decisions.
