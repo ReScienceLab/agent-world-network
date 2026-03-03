@@ -34,12 +34,10 @@ function canonical(msg: P2PMessage): Record<string, unknown> {
   };
 }
 
-/** Check whether an IPv6 address is in the Yggdrasil 200::/8 range. */
-function isYggdrasilAddr(addr: string): boolean {
-  // Yggdrasil uses 0200::/7 which in practice is 200::/8 or 201::/8 etc.
-  // Strip IPv6-mapped IPv4 prefix if needed
+/** Check whether an IPv6 address is in the Yggdrasil 200::/7 range. */
+export function isYggdrasilAddr(addr: string): boolean {
   const clean = addr.replace(/^::ffff:/, "");
-  return /^02[0-9a-f]{2}:/i.test(clean);
+  return /^2[0-9a-f]{2}:/i.test(clean);
 }
 
 export async function startPeerServer(
