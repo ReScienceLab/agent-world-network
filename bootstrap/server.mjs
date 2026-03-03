@@ -78,12 +78,21 @@ function getPeersForExchange(limit = 50) {
 // ---------------------------------------------------------------------------
 // Crypto helpers
 // ---------------------------------------------------------------------------
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === "object") {
+    const sorted = {};
+    for (const k of Object.keys(value).sort()) sorted[k] = canonicalize(value[k]);
+    return sorted;
+  }
+  return value;
+}
+
 function verifySignature(publicKeyB64, obj, signatureB64) {
   try {
     const pubKey = Buffer.from(publicKeyB64, "base64");
     const sig = Buffer.from(signatureB64, "base64");
-    // Must match signMessage in identity.ts: keys sorted alphabetically
-    const msg = Buffer.from(JSON.stringify(obj, Object.keys(obj).sort()));
+    const msg = Buffer.from(JSON.stringify(canonicalize(obj)));
     return nacl.sign.detached.verify(msg, sig, pubKey);
   } catch {
     return false;
@@ -239,8 +248,7 @@ async function syncWithSiblings() {
     timestamp: Date.now(),
     peers: myPeers,
   };
-  const sortedKeys = Object.keys(signable).sort();
-  const msg = Buffer.from(JSON.stringify(signable, sortedKeys));
+  const msg = Buffer.from(JSON.stringify(canonicalize(signable)));
   const sig = nacl.sign.detached(msg, selfKeypair.secretKey);
   const announcement = { ...signable, signature: Buffer.from(sig).toString("base64") };
 

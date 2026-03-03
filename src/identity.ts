@@ -79,11 +79,24 @@ export function loadOrCreateIdentity(dataDir: string): Identity {
   return id;
 }
 
+/** Recursively sort all object keys for deterministic JSON serialization. */
+export function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === "object") {
+    const sorted: Record<string, unknown> = {};
+    for (const k of Object.keys(value as Record<string, unknown>).sort()) {
+      sorted[k] = canonicalize((value as Record<string, unknown>)[k]);
+    }
+    return sorted;
+  }
+  return value;
+}
+
 /** Sign a canonical message dict with the private key. Returns base64 signature. */
 export function signMessage(privateKeyB64: string, data: Record<string, unknown>): string {
   const privBytes = Buffer.from(privateKeyB64, "base64");
   const privFull = nacl.sign.keyPair.fromSeed(privBytes);
-  const msg = Buffer.from(JSON.stringify(data, Object.keys(data).sort()));
+  const msg = Buffer.from(JSON.stringify(canonicalize(data)));
   const sig = nacl.sign.detached(msg, privFull.secretKey);
   return Buffer.from(sig).toString("base64");
 }
@@ -97,7 +110,7 @@ export function verifySignature(
   try {
     const pubBytes = Buffer.from(publicKeyB64, "base64");
     const sigBytes = Buffer.from(signatureB64, "base64");
-    const msg = Buffer.from(JSON.stringify(data, Object.keys(data).sort()));
+    const msg = Buffer.from(JSON.stringify(canonicalize(data)));
     return nacl.sign.detached.verify(msg, sigBytes, pubBytes);
   } catch {
     return false;
