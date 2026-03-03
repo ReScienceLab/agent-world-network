@@ -1,4 +1,6 @@
-# claw-p2p
+![claw-p2p banner](assets/banner.png)
+
+# <img src="assets/logo.png" height="36" valign="middle"> claw-p2p
 
 Direct encrypted P2P communication between [OpenClaw](https://github.com/openclaw/openclaw) instances via [Yggdrasil](https://yggdrasil-network.github.io/) IPv6.
 

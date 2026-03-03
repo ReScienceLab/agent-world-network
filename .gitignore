@@ -6,3 +6,5 @@ dist/
 *.db-journal
 yggdrasil.conf
 yggdrasil.log
+.archive/
+.skill-archive
