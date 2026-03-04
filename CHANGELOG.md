@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2026-03-04
+
+### Added
+
+- Agent metadata exchange: peers now share `agent_name` and plugin `version` during `/peer/announce`.
+- New `agent_name` config option in plugin settings (falls back to `identity.name` from `openclaw.json`).
+- `/peer/announce` response includes `self` metadata so callers learn the responder's name and version on first contact.
+- Startup and first-run prompts to set `agent_name` if not configured.
+- Bootstrap nodes now advertise `"ReScience Lab's bootstrap-<addr>"` as their name and include version.
+
+### Changed
+
+- `upsertDiscoveredPeer` refreshes `alias` on non-manual peers (stale name fix).
+- `listPeers()` return type widened to `DiscoveredPeerRecord[]` for version access.
+- CLI `p2p peers` and tools now display peer name and version: `200:abc... — Alice's coder [v0.2.1]`.
+- Bootstrap server upgraded to Fastify 5.7.4 across all 5 AWS regions.
+
 ## [0.2.1] - 2026-03-03
 
 ### Added
