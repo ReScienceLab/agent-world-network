@@ -9,7 +9,7 @@
 import Fastify, { FastifyInstance } from "fastify"
 import { P2PMessage, Endpoint } from "./types"
 import { verifySignature, agentIdFromPublicKey } from "./identity"
-import { tofuVerifyAndCache, getPeersForExchange, upsertDiscoveredPeer, removePeer } from "./peer-db"
+import { tofuVerifyAndCache, tofuReplaceKey, getPeersForExchange, upsertDiscoveredPeer, removePeer } from "./peer-db"
 
 const MAX_MESSAGE_AGE_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -169,6 +169,48 @@ export async function startPeerServer(
     console.log(`[p2p] <- verified  from=${agentId}  event=${msg.event}`)
 
     _handlers.forEach((h) => h(entry))
+    return { ok: true }
+  })
+
+  server.post("/peer/key-rotation", async (req, reply) => {
+    const rot = req.body as any
+
+    if (!rot.agentId || !rot.oldPublicKey || !rot.newPublicKey || !rot.signatureByOldKey || !rot.signatureByNewKey) {
+      return reply.code(400).send({ error: "Missing required key rotation fields" })
+    }
+
+    // Verify agentId matches oldPublicKey
+    if (agentIdFromPublicKey(rot.oldPublicKey) !== rot.agentId) {
+      return reply.code(400).send({ error: "agentId does not match oldPublicKey" })
+    }
+
+    // Replay protection: reject if timestamp is too old or in future
+    if (rot.timestamp && Math.abs(Date.now() - rot.timestamp) > MAX_MESSAGE_AGE_MS) {
+      return reply.code(400).send({ error: "Key rotation timestamp too old or too far in the future" })
+    }
+
+    // The payload both keys sign
+    const signable = {
+      agentId: rot.agentId,
+      oldPublicKey: rot.oldPublicKey,
+      newPublicKey: rot.newPublicKey,
+      timestamp: rot.timestamp,
+    }
+
+    // Verify old key signature
+    if (!verifySignature(rot.oldPublicKey, signable, rot.signatureByOldKey)) {
+      return reply.code(403).send({ error: "Invalid signatureByOldKey" })
+    }
+
+    // Verify new key signature
+    if (!verifySignature(rot.newPublicKey, signable, rot.signatureByNewKey)) {
+      return reply.code(403).send({ error: "Invalid signatureByNewKey" })
+    }
+
+    // Update TOFU cache to new key
+    tofuReplaceKey(rot.agentId, rot.newPublicKey)
+    console.log(`[p2p] key-rotation  agentId=${rot.agentId}  newKey=${rot.newPublicKey.slice(0, 16)}...`)
+
     return { ok: true }
   })
 
