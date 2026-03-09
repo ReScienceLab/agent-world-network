@@ -75,7 +75,7 @@ export function deriveDidKey(publicKeyB64: string): string {
 
 export function agentIdFromPublicKey(publicKeyB64: string): string {
   const pubBytes = Buffer.from(publicKeyB64, "base64")
-  return Buffer.from(sha256(pubBytes)).toString("hex").slice(0, 16)
+  return Buffer.from(sha256(pubBytes)).toString("hex").slice(0, 32)
 }
 
 export function generateIdentity(): Identity {
@@ -87,7 +87,7 @@ export function generateIdentity(): Identity {
   const privB64 = Buffer.from(privBytes).toString("base64")
 
   const hashHex = Buffer.from(sha256(pubBytes)).toString("hex")
-  const agentId = hashHex.slice(0, 16)
+  const agentId = hashHex.slice(0, 32)
 
   return {
     agentId,
