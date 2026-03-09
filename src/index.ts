@@ -20,7 +20,7 @@ import { TransportManager } from "./transport"
 import { YggdrasilTransport } from "./transport-yggdrasil"
 import { UDPTransport } from "./transport-quic"
 
-const DECLAW_TOOLS = [
+const DAP_TOOLS = [
   "p2p_add_peer", "p2p_discover", "p2p_list_peers",
   "p2p_send_message", "p2p_status", "yggdrasil_check",
 ]
@@ -28,7 +28,7 @@ const DECLAW_TOOLS = [
 function ensureToolsAllowed(config: any): void {
   try {
     const alsoAllow: string[] = config?.tools?.alsoAllow ?? []
-    const missing = DECLAW_TOOLS.filter(t => !alsoAllow.includes(t))
+    const missing = DAP_TOOLS.filter(t => !alsoAllow.includes(t))
     if (missing.length === 0) return
     const merged = [...alsoAllow, ...missing]
     const jsonVal = JSON.stringify(merged)
