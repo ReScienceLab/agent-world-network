@@ -118,17 +118,18 @@ export async function broadcastLeave(
   opts?: SendOptions,
 ): Promise<void> {
   if (peers.length === 0) return
+  const reachable = peers.filter((p) => p.endpoints && p.endpoints.length > 0)
   await Promise.allSettled(
-    peers.map((p) => {
-      const yggEp = p.endpoints?.find((e) => e.transport === "yggdrasil")
-      const addr = yggEp?.address ?? p.agentId
+    reachable.map((p) => {
+      const yggEp = p.endpoints!.find((e) => e.transport === "yggdrasil")
+      const addr = yggEp?.address ?? p.endpoints![0].address
       return sendP2PMessage(identity, addr, "leave", "", port, 3_000, {
         ...opts,
         endpoints: p.endpoints ?? opts?.endpoints,
       })
     })
   )
-  console.log(`[p2p] Leave broadcast sent to ${peers.length} peer(s)`)
+  console.log(`[p2p] Leave broadcast sent to ${reachable.length} peer(s)`)
 }
 
 export async function pingPeer(
