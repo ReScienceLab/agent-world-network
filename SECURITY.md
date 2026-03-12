@@ -31,20 +31,17 @@ Instead, report vulnerabilities privately:
 
 ## Security Model
 
-DAP uses a 4-layer trust model:
+DAP uses a 3-layer trust model:
 
-1. **Network layer**: TCP source IP must be Yggdrasil `200::/7` address
-2. **Anti-spoofing**: `fromYgg` in message body must match TCP source IP
-3. **Application layer**: Ed25519 signature over canonical JSON payload
-4. **TOFU**: First-seen public key is pinned; subsequent messages must match
+1. **Application layer**: Ed25519 signature over canonical JSON payload
+2. **TOFU**: First-seen public key is pinned; subsequent messages must match
+3. **Identity binding**: agentId is derived from public key (sha256[:32]) — unforgeable
 
 ### Sensitive Data
 
 - **Ed25519 private keys** (`~/.openclaw/dap/identity.json`) — never logged or transmitted
-- **Yggdrasil admin socket** (`/var/run/yggdrasil.sock`) — requires appropriate permissions
 
 ### Bootstrap Nodes
 
-- Reject non-Yggdrasil source IPs (HTTP 403)
 - TOFU key mismatch returns 403 with explicit error
-- Yggdrasil config locked with `chattr +i` to prevent key regeneration
+- Rate-limited to prevent spam (configurable per-agent window)
