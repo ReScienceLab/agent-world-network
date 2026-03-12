@@ -1,6 +1,6 @@
 # Contributing to DAP
 
-Thanks for your interest in contributing! DAP is an OpenClaw plugin for direct P2P communication between AI agent instances over Yggdrasil IPv6 mesh network.
+Thanks for your interest in contributing! DAP is an OpenClaw plugin for direct P2P communication between AI agent instances over plain HTTP/TCP.
 
 ## Getting Started
 
@@ -8,7 +8,6 @@ Thanks for your interest in contributing! DAP is an OpenClaw plugin for direct P
 
 - Node.js 20+
 - npm
-- [Yggdrasil](https://yggdrasil-network.github.io/) (for live testing)
 - macOS or Linux
 
 ### Setup
@@ -37,7 +36,7 @@ node --test test/*.test.mjs   # run all tests
 
 - Search [existing issues](https://github.com/ReScienceLab/DAP/issues) first
 - Use the **Bug Report** issue template
-- Include: steps to reproduce, expected vs actual behavior, OS/Node version, Yggdrasil version
+- Include: steps to reproduce, expected vs actual behavior, OS and Node version
 
 ### Suggesting Features
 
@@ -105,12 +104,13 @@ src/peer-server.ts    → Inbound HTTP (Fastify): /peer/message, /peer/announce,
 src/peer-client.ts    → Outbound signed messages
 src/peer-discovery.ts → Bootstrap + gossip discovery loop
 src/peer-db.ts        → JSON peer store with TOFU
-src/identity.ts       → Ed25519 keypair + CGA address derivation
-src/yggdrasil.ts      → Daemon detection/management
+src/identity.ts       → Ed25519 keypair, agentId derivation, DID key
+src/transport.ts      → Transport abstraction + TransportManager
+src/transport-quic.ts → QUIC/UDP transport backend
 src/types.ts          → Shared interfaces
 ```
 
-Trust model (4-layer): TCP source IP → `fromYgg` anti-spoofing → Ed25519 signature → TOFU key pinning.
+Trust model (3-layer): Ed25519 signature → TOFU key pinning → agentId binding.
 
 ## Questions?
 
