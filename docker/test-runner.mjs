@@ -5,7 +5,7 @@
  * NODE_ROLE=server  — starts peer server, waits for a message, exits 0 on success
  * NODE_ROLE=client  — waits for server, sends one message, exits 0 on success
  */
-import { loadOrCreateIdentity, getActualIpv6 } from "./dist/identity.js";
+import { loadOrCreateIdentity, getPublicIPv6 } from "./dist/identity.js";
 import { initDb } from "./dist/peer-db.js";
 import { startPeerServer, getInbox } from "./dist/peer-server.js";
 import { sendP2PMessage } from "./dist/peer-client.js";
@@ -28,20 +28,18 @@ mkdirSync(DATA_DIR, { recursive: true });
 const identity = loadOrCreateIdentity(DATA_DIR);
 initDb(DATA_DIR);
 
-// Use actual container IPv6 as the P2P address (test mode, no Yggdrasil)
-const actualIpv6 = getActualIpv6();
-if (actualIpv6) {
-  identity.yggIpv6 = actualIpv6;
-  console.log(`[${ROLE}] Identity: ${identity.agentId.slice(0, 8)}...`);
-  console.log(`[${ROLE}] IPv6:     ${actualIpv6}`);
+const publicIpv6 = getPublicIPv6();
+console.log(`[${ROLE}] Identity: ${identity.agentId.slice(0, 8)}...`);
+if (publicIpv6) {
+  console.log(`[${ROLE}] IPv6:     ${publicIpv6}`);
 } else {
-  console.warn(`[${ROLE}] WARNING: no non-loopback IPv6 found — messages may fail`);
+  console.warn(`[${ROLE}] WARNING: no globally-routable IPv6 found — using container IPv6`);
 }
 
 // ── SERVER ──────────────────────────────────────────────────────────────────
 if (ROLE === "server") {
   console.log(`[server] Starting peer server on [::]:${PORT} (test mode)...`);
-  await startPeerServer(PORT, { testMode: true });
+  await startPeerServer(PORT);
   console.log("[server] Ready. Waiting for a P2P message...");
 
   const deadline = Date.now() + TIMEOUT_MS;
@@ -50,7 +48,7 @@ if (ROLE === "server") {
     if (inbox.length > 0) {
       const msg = inbox[0];
       console.log(`[server] PASS: received ${inbox.length} message(s)`);
-      console.log(`[server]   from:    ${msg.fromYgg}`);
+      console.log(`[server]   from:    ${msg.from}`);
       console.log(`[server]   content: "${msg.content}"`);
       console.log(`[server]   event:   ${msg.event}`);
       console.log(`[server]   verified: ${msg.verified}`);
