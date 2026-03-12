@@ -251,12 +251,13 @@ export function getEndpointAddress(peer: DiscoveredPeerRecord, transport: string
 
 /**
  * Find peers that have a matching capability.
- * Prefix match: "world:" matches "world:pixel-city", "world:dungeon", etc.
- * Exact match: "world:pixel-city" matches only that capability.
+ * - Prefix match (cap ends with ":"): "world:" matches "world:pixel-city", "world:dungeon", etc.
+ * - Exact match (cap has no trailing ":"): "world:pixel-city" matches only "world:pixel-city".
  * Returns peers sorted by lastSeen descending.
  */
 export function findPeersByCapability(cap: string): DiscoveredPeerRecord[] {
+  const isPrefix = cap.endsWith(":")
   return Object.values(store.peers)
-    .filter((p) => p.capabilities?.some((c) => c === cap || c.startsWith(cap)))
+    .filter((p) => p.capabilities?.some((c) => isPrefix ? c.startsWith(cap) : c === cap))
     .sort((a, b) => b.lastSeen - a.lastSeen)
 }
