@@ -32,7 +32,7 @@ setInterval(() => {
   if (msgs.length > 0) {
     const m = msgs[0];
     console.log(`\n[node-b] *** RECEIVED MESSAGE ***`);
-    console.log(`[node-b]   from   : ${m.fromYgg}`);
+    console.log(`[node-b]   from   : ${m.from}`);
     console.log(`[node-b]   content: "${m.content}"`);
     console.log(`[node-b]   event  : ${m.event}`);
     console.log(`[node-b]   verified: ${m.verified}`);
