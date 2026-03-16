@@ -105,13 +105,16 @@ const peers = new Map(); // agentId -> { agentId, publicKey, alias, endpoints, l
 function upsertPeer(agentId, publicKey, opts = {}) {
   const now = Date.now();
   const existing = peers.get(agentId);
+  const lastSeen = opts.lastSeen
+    ? Math.max(existing?.lastSeen ?? 0, opts.lastSeen)
+    : now;
   peers.set(agentId, {
     agentId,
     publicKey: publicKey || existing?.publicKey || "",
     alias: opts.alias ?? existing?.alias ?? "",
     endpoints: opts.endpoints ?? existing?.endpoints ?? [],
     capabilities: opts.capabilities ?? existing?.capabilities ?? [],
-    lastSeen: now,
+    lastSeen,
   });
   if (peers.size > MAX_PEERS) {
     const oldest = [...peers.values()].sort((a, b) => a.lastSeen - b.lastSeen)[0];
@@ -258,6 +261,7 @@ async function announceToNode(addr, httpPort) {
       if (peer.agentId && peer.agentId !== selfAgentId) {
         upsertPeer(peer.agentId, peer.publicKey, {
           alias: peer.alias, endpoints: peer.endpoints, capabilities: peer.capabilities,
+          lastSeen: peer.lastSeen,
         });
       }
     }

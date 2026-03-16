@@ -104,13 +104,18 @@ const peers = new Map(); // agentId -> PeerRecord
 function upsertPeer(agentId, publicKey, opts = {}) {
   const now = Date.now();
   const existing = peers.get(agentId);
+  // For gossipped peers, preserve the original lastSeen from the sender
+  // Only use Date.now() for direct contacts (no lastSeen provided)
+  const lastSeen = opts.lastSeen
+    ? Math.max(existing?.lastSeen ?? 0, opts.lastSeen)
+    : now;
   peers.set(agentId, {
     agentId,
     publicKey: publicKey || existing?.publicKey || "",
     alias: opts.alias ?? existing?.alias ?? "",
     endpoints: opts.endpoints ?? existing?.endpoints ?? [],
     capabilities: opts.capabilities ?? existing?.capabilities ?? [],
-    lastSeen: now,
+    lastSeen,
   });
   if (peers.size > MAX_PEERS) {
     const oldest = [...peers.values()].sort((a, b) => a.lastSeen - b.lastSeen)[0];
@@ -252,6 +257,7 @@ async function announceToNode(addr, httpPort) {
       if (peer.agentId && peer.agentId !== selfAgentId) {
         upsertPeer(peer.agentId, peer.publicKey, {
           alias: peer.alias, endpoints: peer.endpoints, capabilities: peer.capabilities,
+          lastSeen: peer.lastSeen,
         });
       }
     }
@@ -261,9 +267,15 @@ async function announceToNode(addr, httpPort) {
   }
 }
 
-async function probeWorldReachable(world) {
-  if (!world.endpoints?.length) return false;
-  for (const ep of world.endpoints) {
+function worldIdFromPeer(peer) {
+  const cap = peer.capabilities?.find((c) => c.startsWith("world:"));
+  return cap ? cap.slice("world:".length) : null;
+}
+
+async function probeWorldReachable(peer) {
+  if (!peer.endpoints?.length) return false;
+  const expectedWorldId = worldIdFromPeer(peer);
+  for (const ep of peer.endpoints) {
     try {
       const addr = ep.address;
       const port = ep.port ?? PEER_PORT;
@@ -272,7 +284,8 @@ async function probeWorldReachable(world) {
       const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        if (data.worldId && data.worldId !== world.worldId) return false;
+        // If the ping response contains a worldId, verify it matches
+        if (data.worldId && expectedWorldId && data.worldId !== expectedWorldId) return false;
         return true;
       }
     } catch {}
