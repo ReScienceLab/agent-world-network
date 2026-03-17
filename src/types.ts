@@ -79,8 +79,9 @@ export interface PluginConfig {
   tofu_ttl_days?: number
 }
 
-// ── Key rotation (future) ───────────────────────────────────────────────────
+// ── Key rotation (AgentWire v0.2 §6.10/§10.4) ────────────────────────────────
 
+/** Legacy flat format — kept for backward compatibility */
 export interface KeyRotation {
   agentId: string
   oldPublicKey: string
@@ -88,4 +89,27 @@ export interface KeyRotation {
   timestamp: number
   signatureByOldKey: string
   signatureByNewKey: string
+}
+
+export interface KeyRotationIdentity {
+  agentId: string
+  kid: string
+  publicKeyMultibase: string
+}
+
+/** AgentWire v0.2 structured key rotation format */
+export interface KeyRotationRequestV2 {
+  type: "key-rotation"
+  version: "0.2"
+  logicalCardUrl?: string
+  oldIdentity: KeyRotationIdentity
+  newIdentity: KeyRotationIdentity
+  timestamp: number
+  effectiveAt?: string
+  overlapUntil?: string
+  reason?: string
+  proofs: {
+    signedByOld: string
+    signedByNew: string
+  }
 }
