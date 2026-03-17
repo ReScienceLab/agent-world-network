@@ -121,11 +121,15 @@ export function verifyHttpRequestHeaders(
   body: string,
   publicKeyB64: string
 ): { ok: boolean; error?: string } {
-  const sig = headers["x-agentwire-signature"] as string | undefined
-  const from = headers["x-agentwire-from"] as string | undefined
-  const kid = headers["x-agentwire-keyid"] as string | undefined
-  const ts = headers["x-agentwire-timestamp"] as string | undefined
-  const cd = headers["content-digest"] as string | undefined
+  // Normalize to lowercase so callers can pass either Fastify req.headers or raw AwRequestHeaders
+  const h: Record<string, string | string[] | undefined> = {}
+  for (const [k, v] of Object.entries(headers)) h[k.toLowerCase()] = v
+
+  const sig = h["x-agentwire-signature"] as string | undefined
+  const from = h["x-agentwire-from"] as string | undefined
+  const kid = h["x-agentwire-keyid"] as string | undefined
+  const ts = h["x-agentwire-timestamp"] as string | undefined
+  const cd = h["content-digest"] as string | undefined
 
   if (!sig || !from || !kid || !ts || !cd) {
     return { ok: false, error: "Missing required AgentWire headers" }
