@@ -45,6 +45,12 @@ export interface WorldConfig {
    * Use this to register additional Fastify routes (e.g. static files, REST endpoints).
    */
   setupRoutes?: (fastify: import("fastify").FastifyInstance) => void | Promise<void>
+  /** If provided, serve GET /.well-known/agent.json with a JWS-signed Agent Card */
+  cardUrl?: string
+  /** Agent name for the card (defaults to worldName) */
+  cardName?: string
+  /** Agent description for the card */
+  cardDescription?: string
   worldName?: string
   worldTheme?: string
   /** Listen port (default 8099) */
@@ -87,4 +93,30 @@ export interface WorldServer {
   fastify: import("fastify").FastifyInstance
   identity: Identity
   stop(): Promise<void>
+}
+
+// ── Key rotation (AgentWire v0.2 §6.10/§10.4) ────────────────────────────────
+
+export interface KeyRotationIdentity {
+  agentId: string
+  kid: string
+  publicKeyMultibase: string
+}
+
+export interface KeyRotationRequest {
+  type: "key-rotation"
+  version: "0.2"
+  logicalCardUrl?: string
+  oldIdentity: KeyRotationIdentity
+  newIdentity: KeyRotationIdentity
+  timestamp: number
+  /** ISO-8601: when rotation is effective */
+  effectiveAt?: string
+  /** ISO-8601: end of overlap window where old key is still accepted */
+  overlapUntil?: string
+  reason?: string
+  proofs: {
+    signedByOld: string
+    signedByNew: string
+  }
 }
