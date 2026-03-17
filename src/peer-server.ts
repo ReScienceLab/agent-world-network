@@ -86,12 +86,12 @@ function signResponse(status: number, bodyStr: string): Record<string, string> |
     _signingKey.secretKey
   )
   return {
-    "X-AgentWire-Version": PROTOCOL_VERSION,
-    "X-AgentWire-From": _signingKey.agentId,
-    "X-AgentWire-KeyId": kid,
-    "X-AgentWire-Timestamp": ts,
+    "X-AgentWorld-Version": PROTOCOL_VERSION,
+    "X-AgentWorld-From": _signingKey.agentId,
+    "X-AgentWorld-KeyId": kid,
+    "X-AgentWorld-Timestamp": ts,
     "Content-Digest": contentDigest,
-    "X-AgentWire-Signature": Buffer.from(sig).toString("base64"),
+    "X-AgentWorld-Signature": Buffer.from(sig).toString("base64"),
   }
 }
 
@@ -104,7 +104,7 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
 
   server = Fastify({ logger: false })
 
-  // Sign all /peer/* JSON responses (P2a — AgentWire v0.2 response signing)
+  // Sign all /peer/* JSON responses (P2a — AgentWorld v0.2 response signing)
   server.addHook("onSend", async (_req, reply, payload) => {
     if (!_signingKey || typeof payload !== "string") return payload
     const url = ((_req as any).url ?? "").split("?")[0] as string
@@ -234,8 +234,8 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
       return reply.code(400).send({ error: "Missing required key rotation fields" })
     }
 
-    if (rot.type !== "agentwire-identity-rotation" || rot.version !== PROTOCOL_VERSION) {
-      return reply.code(400).send({ error: `Expected type=agentwire-identity-rotation and version=${PROTOCOL_VERSION}` })
+    if (rot.type !== "agentworld-identity-rotation" || rot.version !== PROTOCOL_VERSION) {
+      return reply.code(400).send({ error: `Expected type=agentworld-identity-rotation and version=${PROTOCOL_VERSION}` })
     }
 
     const agentId: string = rot.oldAgentId

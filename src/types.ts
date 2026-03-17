@@ -79,7 +79,7 @@ export interface PluginConfig {
   tofu_ttl_days?: number
 }
 
-// ── Key rotation (AgentWire v0.2 §6.10/§10.4) ────────────────────────────────
+// ── Key rotation (AgentWorld v0.2 §6.10/§10.4) ────────────────────────────────
 
 export interface KeyRotationIdentity {
   agentId: string
@@ -93,7 +93,7 @@ export interface KeyRotationProof {
 }
 
 export interface KeyRotationRequestV2 {
-  type: "agentwire-identity-rotation"
+  type: "agentworld-identity-rotation"
   version: string
   logicalCardUrl?: string
   oldAgentId: string

@@ -64,7 +64,7 @@ function makeRotationBody(oldKey, newKey, overrideProofOld) {
     timestamp: Date.now(),
   }
   return {
-    type: "agentwire-identity-rotation",
+    type: "agentworld-identity-rotation",
     version: PROTOCOL_VERSION,
     oldAgentId: oldKey.agentId,
     newAgentId: newKey.agentId,
@@ -130,7 +130,7 @@ describe("key rotation endpoint", () => {
       timestamp: Date.now(),
     }
     const body = {
-      type: "agentwire-identity-rotation",
+      type: "agentworld-identity-rotation",
       version: PROTOCOL_VERSION,
       oldAgentId: otherKey.agentId,
       newAgentId: newKey.agentId,
@@ -154,7 +154,7 @@ describe("key rotation endpoint", () => {
     const resp = await fetch(`http://[::1]:${port}/peer/key-rotation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "agentwire-identity-rotation", version: PROTOCOL_VERSION }),
+      body: JSON.stringify({ type: "agentworld-identity-rotation", version: PROTOCOL_VERSION }),
     })
     assert.equal(resp.status, 400)
   })
@@ -196,7 +196,7 @@ describe("key rotation endpoint", () => {
       timestamp: Date.now(),
     }
     const body = {
-      type: "agentwire-identity-rotation",
+      type: "agentworld-identity-rotation",
       version: PROTOCOL_VERSION,
       oldAgentId: tofuKey.agentId,
       newAgentId: newKey.agentId,

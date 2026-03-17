@@ -309,7 +309,7 @@ async function startPeerListener() {
     const ann = req.body;
     if (!ann?.publicKey || !ann?.from) return reply.code(400).send({ error: "Invalid announce" });
 
-    const awSig = req.headers["x-agentwire-signature"];
+    const awSig = req.headers["x-agentworld-signature"];
     if (awSig) {
       const authority = req.headers["host"] ?? "localhost";
       const result = verifyHttpRequestHeaders(req.headers, req.method, req.url, authority, req.rawBody, ann.publicKey);
@@ -334,7 +334,7 @@ async function startPeerListener() {
     const msg = req.body;
     if (!msg?.publicKey || !msg?.from) return reply.code(400).send({ error: "Invalid message" });
 
-    const awSig = req.headers["x-agentwire-signature"];
+    const awSig = req.headers["x-agentworld-signature"];
     if (awSig) {
       const authority = req.headers["host"] ?? "localhost";
       const result = verifyHttpRequestHeaders(req.headers, req.method, req.url, authority, req.rawBody, msg.publicKey);

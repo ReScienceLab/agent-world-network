@@ -1,8 +1,8 @@
 /**
- * AgentWire v0.2 Agent Card builder.
+ * AgentWorld v0.2 Agent Card builder.
  *
  * Builds and JWS-signs a standard A2A-compatible Agent Card with an
- * `extensions.agentwire` block. The card is served at /.well-known/agent.json.
+ * `extensions.agentworld` block. The card is served at /.well-known/agent.json.
  *
  * Signing uses jose FlattenedSign (EdDSA/Ed25519). The `payload` field is
  * omitted from the stored signature entry — the card body itself is the
@@ -32,7 +32,7 @@ export interface AgentCardOpts {
   cardUrl: string
   /** A2A JSON-RPC endpoint URL (optional) */
   rpcUrl?: string
-  /** AgentWire profiles to declare. Defaults to ["core/v0.2"] */
+  /** AgentWorld profiles to declare. Defaults to ["core/v0.2"] */
   profiles?: string[]
   /** Conformance node class. Defaults to "CoreNode" */
   nodeClass?: string
@@ -41,7 +41,7 @@ export interface AgentCardOpts {
 }
 
 /**
- * Build and JWS-sign an AgentWire v0.2 Agent Card.
+ * Build and JWS-sign an AgentWorld v0.2 Agent Card.
  *
  * Returns the canonical JSON string that MUST be served verbatim as
  * `application/json`. The JWS signature covers
@@ -64,7 +64,7 @@ export async function buildSignedAgentCard(
     ...(opts.description ? { description: opts.description } : {}),
     ...(opts.rpcUrl ? { a2a: { rpcUrl: opts.rpcUrl } } : {}),
     extensions: {
-      agentwire: {
+      agentworld: {
         version: PROTOCOL_VERSION,
         agentId: identity.agentId,
         identityMode: "direct",
@@ -76,12 +76,12 @@ export async function buildSignedAgentCard(
         },
         requestSigning: {
           headers: [
-            "X-AgentWire-Version",
-            "X-AgentWire-From",
-            "X-AgentWire-KeyId",
-            "X-AgentWire-Timestamp",
+            "X-AgentWorld-Version",
+            "X-AgentWorld-From",
+            "X-AgentWorld-KeyId",
+            "X-AgentWorld-Timestamp",
             "Content-Digest",
-            "X-AgentWire-Signature",
+            "X-AgentWorld-Signature",
           ],
         },
         profiles,

@@ -55,7 +55,7 @@ export function registerPeerRoutes(
     }
   )
 
-  // Sign all /peer/* JSON responses (P2a — AgentWire v0.2 response signing)
+  // Sign all /peer/* JSON responses (P2a — AgentWorld v0.2 response signing)
   fastify.addHook("onSend", async (_req, reply, payload) => {
     if (typeof payload !== "string") return payload
     const url = (_req.url ?? "").split("?")[0]
@@ -102,7 +102,7 @@ export function registerPeerRoutes(
       return reply.code(400).send({ error: "Invalid announce" })
     }
 
-    const awSig = req.headers["x-agentwire-signature"]
+    const awSig = req.headers["x-agentworld-signature"]
     if (awSig) {
       const rawBody = (req as unknown as { rawBody: string }).rawBody
       const authority = (req.headers["host"] as string) ?? "localhost"
@@ -135,7 +135,7 @@ export function registerPeerRoutes(
       return reply.code(400).send({ error: "Invalid message" })
     }
 
-    const awSig = req.headers["x-agentwire-signature"]
+    const awSig = req.headers["x-agentworld-signature"]
     if (awSig) {
       const rawBody = (req as unknown as { rawBody: string }).rawBody
       const authority = (req.headers["host"] as string) ?? "localhost"
@@ -186,12 +186,12 @@ export function registerPeerRoutes(
     }
   })
 
-  // POST /peer/key-rotation — AgentWire v0.2 §6.10/§10.4
+  // POST /peer/key-rotation — AgentWorld v0.2 §6.10/§10.4
   fastify.post("/peer/key-rotation", async (req, reply) => {
     const rot = req.body as unknown as KeyRotationRequest
 
-    if (rot?.type !== "agentwire-identity-rotation" || rot?.version !== PROTOCOL_VERSION) {
-      return reply.code(400).send({ error: `Expected type=agentwire-identity-rotation and version=${PROTOCOL_VERSION}` })
+    if (rot?.type !== "agentworld-identity-rotation" || rot?.version !== PROTOCOL_VERSION) {
+      return reply.code(400).send({ error: `Expected type=agentworld-identity-rotation and version=${PROTOCOL_VERSION}` })
     }
 
     if (!rot.oldAgentId || !rot.newAgentId ||
