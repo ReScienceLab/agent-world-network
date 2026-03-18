@@ -28,13 +28,21 @@ import Fastify from "fastify";
 import websocketPlugin from "@fastify/websocket";
 import cors from "@fastify/cors";
 import nacl from "tweetnacl";
-import fs from "fs";
-import path from "path";
-import crypto from "node:crypto";
+import {
+  agentIdFromPublicKey,
+  canonicalize,
+  verifySignature,
+  signPayload,
+  signHttpRequest,
+  verifyHttpRequestHeaders,
+  loadOrCreateIdentity,
+  buildSignedAgentCard,
+} from "@resciencelab/agent-world-sdk";
 
 const PEER_PORT = parseInt(process.env.PEER_PORT ?? "8099");
 const HTTP_PORT = parseInt(process.env.HTTP_PORT ?? "8100");
 const PUBLIC_ADDR = process.env.PUBLIC_ADDR ?? null;
+const PUBLIC_URL = process.env.PUBLIC_URL ?? null; // e.g. https://gateway.example.com
 const DATA_DIR = process.env.DATA_DIR ?? "/data";
 const BOOTSTRAP_URL = process.env.BOOTSTRAP_URL ?? "https://resciencelab.github.io/DAP/bootstrap.json";
 const DISCOVERY_INTERVAL_MS = parseInt(process.env.DISCOVERY_INTERVAL_MS ?? "60000");
@@ -42,57 +50,12 @@ const STALE_TTL_MS = parseInt(process.env.STALE_TTL_MS ?? String(30 * 60 * 1000)
 const MAX_PEERS = 500;
 
 // ---------------------------------------------------------------------------
-// Crypto helpers
+// Identity (loaded via agent-world-sdk)
 // ---------------------------------------------------------------------------
 
-function agentIdFromPublicKey(publicKeyB64) {
-  return crypto.createHash("sha256").update(Buffer.from(publicKeyB64, "base64")).digest("hex").slice(0, 32);
-}
-
-function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value !== null && typeof value === "object") {
-    const sorted = {};
-    for (const k of Object.keys(value).sort()) sorted[k] = canonicalize(value[k]);
-    return sorted;
-  }
-  return value;
-}
-
-function verifySignature(publicKeyB64, obj, signatureB64) {
-  try {
-    const pubKey = Buffer.from(publicKeyB64, "base64");
-    const sig = Buffer.from(signatureB64, "base64");
-    const msg = Buffer.from(JSON.stringify(canonicalize(obj)));
-    return nacl.sign.detached.verify(msg, sig, pubKey);
-  } catch { return false; }
-}
-
-function signPayload(payload, secretKey) {
-  const sig = nacl.sign.detached(Buffer.from(JSON.stringify(canonicalize(payload))), secretKey);
-  return Buffer.from(sig).toString("base64");
-}
-
-// ---------------------------------------------------------------------------
-// Identity
-// ---------------------------------------------------------------------------
-fs.mkdirSync(DATA_DIR, { recursive: true });
-
-const idFile = path.join(DATA_DIR, "gateway-identity.json");
-let selfKeypair;
-if (fs.existsSync(idFile)) {
-  const saved = JSON.parse(fs.readFileSync(idFile, "utf8"));
-  selfKeypair = nacl.sign.keyPair.fromSeed(Buffer.from(saved.seed, "base64"));
-} else {
-  const seed = nacl.randomBytes(32);
-  selfKeypair = nacl.sign.keyPair.fromSeed(seed);
-  fs.writeFileSync(idFile, JSON.stringify({
-    seed: Buffer.from(seed).toString("base64"),
-    publicKey: Buffer.from(selfKeypair.publicKey).toString("base64"),
-  }, null, 2));
-}
-const selfPubB64 = Buffer.from(selfKeypair.publicKey).toString("base64");
-const selfAgentId = agentIdFromPublicKey(selfPubB64);
+const identity = loadOrCreateIdentity(DATA_DIR, "gateway-identity");
+const selfPubB64 = identity.pubB64;
+const selfAgentId = identity.agentId;
 
 console.log(`[gateway] agentId=${selfAgentId}`);
 
@@ -192,7 +155,7 @@ async function sendToWorld(worldId, event, content) {
     content: typeof content === "string" ? content : JSON.stringify(content),
     timestamp: Date.now(),
   };
-  payload.signature = signPayload(payload, selfKeypair.secretKey);
+  payload.signature = signPayload(payload, identity.secretKey);
 
   for (const ep of sorted) {
     try {
@@ -200,10 +163,13 @@ async function sendToWorld(worldId, event, content) {
       const port = ep.port ?? PEER_PORT;
       const isIpv6 = addr.includes(":") && !addr.includes(".");
       const url = isIpv6 ? `http://[${addr}]:${port}/peer/message` : `http://${addr}:${port}/peer/message`;
+      const body = JSON.stringify(canonicalize(payload));
+      const urlObj = new URL(url);
+      const awHeaders = signHttpRequest(identity, "POST", urlObj.host, "/peer/message", body);
       const resp = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json", ...awHeaders },
+        body,
         signal: AbortSignal.timeout(8_000),
       });
       const data = await resp.json();
@@ -243,12 +209,15 @@ async function announceToNode(addr, httpPort) {
     capabilities: ["gateway"],
     timestamp: Date.now(),
   };
-  payload.signature = signPayload(payload, selfKeypair.secretKey);
+  payload.signature = signPayload(payload, identity.secretKey);
   try {
+    const body = JSON.stringify(canonicalize(payload));
+    const urlObj = new URL(url);
+    const awHeaders = signHttpRequest(identity, "POST", urlObj.host, "/peer/announce", body);
     const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json", ...awHeaders },
+      body,
       signal: AbortSignal.timeout(10_000),
     });
     if (!resp.ok) return;
@@ -329,10 +298,20 @@ async function startPeerListener() {
   peerServer.post("/peer/announce", async (req, reply) => {
     const ann = req.body;
     if (!ann?.publicKey || !ann?.from) return reply.code(400).send({ error: "Invalid announce" });
-    const { signature, ...signable } = ann;
-    if (!verifySignature(ann.publicKey, signable, signature)) {
-      return reply.code(403).send({ error: "Invalid signature" });
+
+    const awSig = req.headers["x-agentwire-signature"];
+    if (awSig) {
+      const rawBody = JSON.stringify(canonicalize(ann));
+      const authority = req.headers["host"] ?? "localhost";
+      const result = verifyHttpRequestHeaders(req.headers, req.method, req.url, authority, rawBody, ann.publicKey);
+      if (!result.ok) return reply.code(403).send({ error: result.error });
+    } else {
+      const { signature, ...signable } = ann;
+      if (!verifySignature(ann.publicKey, signable, signature)) {
+        return reply.code(403).send({ error: "Invalid signature" });
+      }
     }
+
     if (agentIdFromPublicKey(ann.publicKey) !== ann.from) {
       return reply.code(400).send({ error: "agentId mismatch" });
     }
@@ -345,9 +324,18 @@ async function startPeerListener() {
   peerServer.post("/peer/message", async (req, reply) => {
     const msg = req.body;
     if (!msg?.publicKey || !msg?.from) return reply.code(400).send({ error: "Invalid message" });
-    const { signature, ...signable } = msg;
-    if (!verifySignature(msg.publicKey, signable, signature)) {
-      return reply.code(403).send({ error: "Invalid signature" });
+
+    const awSig = req.headers["x-agentwire-signature"];
+    if (awSig) {
+      const rawBody = JSON.stringify(canonicalize(msg));
+      const authority = req.headers["host"] ?? "localhost";
+      const result = verifyHttpRequestHeaders(req.headers, req.method, req.url, authority, rawBody, msg.publicKey);
+      if (!result.ok) return reply.code(403).send({ error: result.error });
+    } else {
+      const { signature, ...signable } = msg;
+      if (!verifySignature(msg.publicKey, signable, signature)) {
+        return reply.code(403).send({ error: "Invalid signature" });
+      }
     }
 
     // Handle world.state broadcasts from World Agents
@@ -378,6 +366,23 @@ app.get("/health", async () => ({
   ok: true, ts: Date.now(), agentId: selfAgentId,
   peers: peers.size, worlds: findByCapability("world:").length,
 }));
+
+// Agent Card — served as canonical JSON so bytes on wire match the JWS signature
+let _cachedCardJson = null;
+app.get("/.well-known/agent.json", async (_req, reply) => {
+  if (!_cachedCardJson) {
+    const cardUrl = PUBLIC_URL
+      ? `${PUBLIC_URL.replace(/\/$/, "")}/.well-known/agent.json`
+      : `http://${PUBLIC_ADDR ?? "localhost"}:${HTTP_PORT}/.well-known/agent.json`;
+    _cachedCardJson = await buildSignedAgentCard(
+      { name: "DAP Gateway", cardUrl, profiles: ["core/v0.2"], nodeClass: "CoreNode" },
+      identity
+    );
+  }
+  reply.header("Content-Type", "application/json; charset=utf-8");
+  reply.header("Cache-Control", "public, max-age=300");
+  reply.send(_cachedCardJson);
+});
 
 app.get("/agents", async () => ({
   agents: getPeersForExchange(100),

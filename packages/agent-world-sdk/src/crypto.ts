@@ -2,10 +2,10 @@ import crypto from "node:crypto"
 import nacl from "tweetnacl"
 
 export function agentIdFromPublicKey(publicKeyB64: string): string {
-  return crypto.createHash("sha256")
+  const fullHex = crypto.createHash("sha256")
     .update(Buffer.from(publicKeyB64, "base64"))
     .digest("hex")
-    .slice(0, 32)
+  return `aw:sha256:${fullHex}`
 }
 
 export function canonicalize(value: unknown): unknown {
@@ -37,4 +37,213 @@ export function signPayload(payload: unknown, secretKey: Uint8Array): string {
     secretKey
   )
   return Buffer.from(sig).toString("base64")
+}
+
+// ── AgentWire v0.2 HTTP header signing ───────────────────────────────────────
+
+const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000
+
+export function computeContentDigest(body: string): string {
+  const hash = crypto.createHash("sha256").update(Buffer.from(body, "utf8")).digest("base64")
+  return `sha-256=:${hash}:`
+}
+
+export interface AwRequestHeaders {
+  "X-AgentWire-Version": string
+  "X-AgentWire-From": string
+  "X-AgentWire-KeyId": string
+  "X-AgentWire-Timestamp": string
+  "Content-Digest": string
+  "X-AgentWire-Signature": string
+}
+
+function buildRequestSigningInput(opts: {
+  from: string
+  kid: string
+  ts: string
+  method: string
+  authority: string
+  path: string
+  contentDigest: string
+}): Record<string, string> {
+  return {
+    v: "0.2",
+    from: opts.from,
+    kid: opts.kid,
+    ts: opts.ts,
+    method: opts.method.toUpperCase(),
+    authority: opts.authority,
+    path: opts.path,
+    contentDigest: opts.contentDigest,
+  }
+}
+
+/**
+ * Produce AgentWire v0.2 HTTP request signing headers.
+ * Include alongside Content-Type in outbound fetch calls.
+ */
+export function signHttpRequest(
+  identity: { agentId: string; secretKey: Uint8Array },
+  method: string,
+  authority: string,
+  path: string,
+  body: string
+): AwRequestHeaders {
+  const ts = new Date().toISOString()
+  const kid = "#identity"
+  const contentDigest = computeContentDigest(body)
+  const signingInput = buildRequestSigningInput({
+    from: identity.agentId, kid, ts, method, authority, path, contentDigest,
+  })
+  const sig = nacl.sign.detached(
+    Buffer.from(JSON.stringify(canonicalize(signingInput))),
+    identity.secretKey
+  )
+  return {
+    "X-AgentWire-Version": "0.2",
+    "X-AgentWire-From": identity.agentId,
+    "X-AgentWire-KeyId": kid,
+    "X-AgentWire-Timestamp": ts,
+    "Content-Digest": contentDigest,
+    "X-AgentWire-Signature": Buffer.from(sig).toString("base64"),
+  }
+}
+
+/**
+ * Verify AgentWire v0.2 HTTP request headers.
+ * Returns { ok: true } if valid, { ok: false, error } otherwise.
+ */
+export function verifyHttpRequestHeaders(
+  headers: Record<string, string | string[] | undefined>,
+  method: string,
+  path: string,
+  authority: string,
+  body: string,
+  publicKeyB64: string
+): { ok: boolean; error?: string } {
+  // Normalize to lowercase so callers can pass either Fastify req.headers or raw AwRequestHeaders
+  const h: Record<string, string | string[] | undefined> = {}
+  for (const [k, v] of Object.entries(headers)) h[k.toLowerCase()] = v
+
+  const sig = h["x-agentwire-signature"] as string | undefined
+  const from = h["x-agentwire-from"] as string | undefined
+  const kid = h["x-agentwire-keyid"] as string | undefined
+  const ts = h["x-agentwire-timestamp"] as string | undefined
+  const cd = h["content-digest"] as string | undefined
+
+  if (!sig || !from || !kid || !ts || !cd) {
+    return { ok: false, error: "Missing required AgentWire headers" }
+  }
+
+  const tsDiff = Math.abs(Date.now() - new Date(ts).getTime())
+  if (isNaN(tsDiff) || tsDiff > MAX_CLOCK_SKEW_MS) {
+    return { ok: false, error: "X-AgentWire-Timestamp outside acceptable skew window" }
+  }
+
+  const expectedDigest = computeContentDigest(body)
+  if (cd !== expectedDigest) {
+    return { ok: false, error: "Content-Digest mismatch" }
+  }
+
+  const signingInput = buildRequestSigningInput({
+    from, kid, ts, method, authority, path, contentDigest: cd,
+  })
+  const ok = verifySignature(publicKeyB64, signingInput, sig)
+  return ok ? { ok: true } : { ok: false, error: "Invalid X-AgentWire-Signature" }
+}
+
+// ── AgentWire v0.2 HTTP response signing ─────────────────────────────────────
+
+export interface AwResponseHeaders {
+  "X-AgentWire-Version": string
+  "X-AgentWire-From": string
+  "X-AgentWire-KeyId": string
+  "X-AgentWire-Timestamp": string
+  "Content-Digest": string
+  "X-AgentWire-Signature": string
+}
+
+function buildResponseSigningInput(opts: {
+  from: string
+  kid: string
+  ts: string
+  status: number
+  contentDigest: string
+}): Record<string, unknown> {
+  return {
+    v: "0.2",
+    from: opts.from,
+    kid: opts.kid,
+    ts: opts.ts,
+    status: opts.status,
+    contentDigest: opts.contentDigest,
+  }
+}
+
+/**
+ * Produce AgentWire v0.2 HTTP response signing headers.
+ * Add to Fastify reply before sending the body.
+ */
+export function signHttpResponse(
+  identity: { agentId: string; secretKey: Uint8Array },
+  status: number,
+  body: string
+): AwResponseHeaders {
+  const ts = new Date().toISOString()
+  const kid = "#identity"
+  const contentDigest = computeContentDigest(body)
+  const signingInput = buildResponseSigningInput({
+    from: identity.agentId, kid, ts, status, contentDigest,
+  })
+  const sig = nacl.sign.detached(
+    Buffer.from(JSON.stringify(canonicalize(signingInput))),
+    identity.secretKey
+  )
+  return {
+    "X-AgentWire-Version": "0.2",
+    "X-AgentWire-From": identity.agentId,
+    "X-AgentWire-KeyId": kid,
+    "X-AgentWire-Timestamp": ts,
+    "Content-Digest": contentDigest,
+    "X-AgentWire-Signature": Buffer.from(sig).toString("base64"),
+  }
+}
+
+/**
+ * Verify AgentWire v0.2 HTTP response headers from an inbound response.
+ * Returns { ok: true } if valid, { ok: false, error } otherwise.
+ */
+export function verifyHttpResponseHeaders(
+  headers: Record<string, string | null>,
+  status: number,
+  body: string,
+  publicKeyB64: string
+): { ok: boolean; error?: string } {
+  // Normalize to lowercase so callers can pass title-cased AwResponseHeaders or fetch Headers
+  const h: Record<string, string | null> = {}
+  for (const [k, v] of Object.entries(headers)) h[k.toLowerCase()] = v
+
+  const sig = h["x-agentwire-signature"]
+  const from = h["x-agentwire-from"]
+  const kid = h["x-agentwire-keyid"]
+  const ts = h["x-agentwire-timestamp"]
+  const cd = h["content-digest"]
+
+  if (!sig || !from || !kid || !ts || !cd) {
+    return { ok: false, error: "Missing required AgentWire response headers" }
+  }
+
+  const tsDiff = Math.abs(Date.now() - new Date(ts).getTime())
+  if (isNaN(tsDiff) || tsDiff > MAX_CLOCK_SKEW_MS) {
+    return { ok: false, error: "X-AgentWire-Timestamp outside acceptable skew window" }
+  }
+
+  const expectedDigest = computeContentDigest(body)
+  if (cd !== expectedDigest) {
+    return { ok: false, error: "Content-Digest mismatch" }
+  }
+
+  const signingInput = buildResponseSigningInput({ from, kid, ts, status, contentDigest: cd })
+  const ok = verifySignature(publicKeyB64, signingInput, sig)
+  return ok ? { ok: true } : { ok: false, error: "Invalid X-AgentWire-Signature" }
 }

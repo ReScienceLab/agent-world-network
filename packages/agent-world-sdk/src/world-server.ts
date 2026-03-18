@@ -3,7 +3,7 @@ import { loadOrCreateIdentity } from "./identity.js"
 import { PeerDb } from "./peer-db.js"
 import { registerPeerRoutes } from "./peer-protocol.js"
 import { startDiscovery } from "./bootstrap.js"
-import { signPayload } from "./crypto.js"
+import { canonicalize, signPayload, signHttpRequest } from "./crypto.js"
 import type { WorldConfig, WorldHooks, WorldServer } from "./types.js"
 
 const DEFAULT_BOOTSTRAP_URL = "https://resciencelab.github.io/DAP/bootstrap.json"
@@ -39,6 +39,9 @@ export async function createWorldServer(
     discoveryIntervalMs = 10 * 60 * 1000,
     staleTtlMs = 30 * 60 * 1000,
     setupRoutes,
+    cardUrl,
+    cardName,
+    cardDescription,
   } = config
 
   const resolvedPublicPort = publicPort ?? port
@@ -57,6 +60,9 @@ export async function createWorldServer(
   registerPeerRoutes(fastify, {
     identity,
     peerDb,
+    card: cardUrl
+      ? { name: cardName ?? worldName, description: cardDescription, cardUrl }
+      : undefined,
     pingExtra: () => ({
       worldId,
       worldName,
@@ -143,10 +149,13 @@ export async function createWorldServer(
             const url = isIpv6
               ? `http://[${ep.address}]:${ep.port ?? 8099}/peer/message`
               : `http://${ep.address}:${ep.port ?? 8099}/peer/message`
+            const body = JSON.stringify(canonicalize(payload))
+            const urlObj = new URL(url)
+            const awHeaders = signHttpRequest(identity, "POST", urlObj.host, "/peer/message", body)
             await fetch(url, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
+              headers: { "Content-Type": "application/json", ...awHeaders },
+              body,
               signal: AbortSignal.timeout(8_000),
             })
             return

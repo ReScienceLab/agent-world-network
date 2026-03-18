@@ -1,4 +1,4 @@
-import { signPayload } from "./crypto.js"
+import { canonicalize, signPayload, signHttpRequest } from "./crypto.js"
 import type { BootstrapNode, Identity } from "./types.js"
 import type { PeerDb } from "./peer-db.js"
 
@@ -54,10 +54,13 @@ export async function announceToNode(
   payload["signature"] = signPayload(payload, identity.secretKey)
 
   try {
+    const body = JSON.stringify(canonicalize(payload))
+    const urlObj = new URL(url)
+    const awHeaders = signHttpRequest(identity, "POST", urlObj.host, urlObj.pathname, body)
     const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json", ...awHeaders },
+      body,
       signal: AbortSignal.timeout(10_000),
     })
     if (!resp.ok) return
