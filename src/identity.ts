@@ -135,11 +135,11 @@ export function computeContentDigest(body: string): string {
 }
 
 function buildRequestSigningInput(opts: {
-  from: string; kid: string; ts: string
+  v: string; from: string; kid: string; ts: string
   method: string; authority: string; path: string; contentDigest: string
 }): Record<string, string> {
   return {
-    v: PROTOCOL_VERSION,
+    v: opts.v,
     from: opts.from,
     kid: opts.kid,
     ts: opts.ts,
@@ -151,11 +151,11 @@ function buildRequestSigningInput(opts: {
 }
 
 function buildResponseSigningInput(opts: {
-  from: string; kid: string; ts: string
+  v: string; from: string; kid: string; ts: string
   status: number; contentDigest: string
 }): Record<string, unknown> {
   return {
-    v: PROTOCOL_VERSION,
+    v: opts.v,
     from: opts.from,
     kid: opts.kid,
     ts: opts.ts,
@@ -176,7 +176,7 @@ export function signHttpRequest(
   const kid = "#identity"
   const contentDigest = computeContentDigest(body)
   const signingInput = buildRequestSigningInput({
-    from: identity.agentId, kid, ts, method, authority, path: reqPath, contentDigest,
+    v: PROTOCOL_VERSION, from: identity.agentId, kid, ts, method, authority, path: reqPath, contentDigest,
   })
   const sig = nacl.sign.detached(
     Buffer.from(JSON.stringify(canonicalize(signingInput))),
@@ -203,13 +203,14 @@ export function verifyHttpRequestHeaders(
   const h: Record<string, string | string[] | undefined> = {}
   for (const [k, v] of Object.entries(headers)) h[k.toLowerCase()] = v
 
+  const ver = h["x-agentworld-version"] as string | undefined
   const sig = h["x-agentworld-signature"] as string | undefined
   const from = h["x-agentworld-from"] as string | undefined
   const kid = h["x-agentworld-keyid"] as string | undefined
   const ts = h["x-agentworld-timestamp"] as string | undefined
   const cd = h["content-digest"] as string | undefined
 
-  if (!sig || !from || !kid || !ts || !cd) {
+  if (!ver || !sig || !from || !kid || !ts || !cd) {
     return { ok: false, error: "Missing required AgentWorld headers" }
   }
 
@@ -224,7 +225,7 @@ export function verifyHttpRequestHeaders(
   }
 
   const signingInput = buildRequestSigningInput({
-    from, kid, ts, method, authority, path: reqPath, contentDigest: cd,
+    v: ver, from, kid, ts, method, authority, path: reqPath, contentDigest: cd,
   })
   const ok = verifySignature(publicKeyB64, signingInput, sig)
   return ok ? { ok: true } : { ok: false, error: "Invalid X-AgentWorld-Signature" }
@@ -240,7 +241,7 @@ export function signHttpResponse(
   const kid = "#identity"
   const contentDigest = computeContentDigest(body)
   const signingInput = buildResponseSigningInput({
-    from: identity.agentId, kid, ts, status, contentDigest,
+    v: PROTOCOL_VERSION, from: identity.agentId, kid, ts, status, contentDigest,
   })
   const sig = nacl.sign.detached(
     Buffer.from(JSON.stringify(canonicalize(signingInput))),
@@ -265,13 +266,14 @@ export function verifyHttpResponseHeaders(
   const h: Record<string, string | null> = {}
   for (const [k, v] of Object.entries(headers)) h[k.toLowerCase()] = v
 
+  const ver = h["x-agentworld-version"]
   const sig = h["x-agentworld-signature"]
   const from = h["x-agentworld-from"]
   const kid = h["x-agentworld-keyid"]
   const ts = h["x-agentworld-timestamp"]
   const cd = h["content-digest"]
 
-  if (!sig || !from || !kid || !ts || !cd) {
+  if (!ver || !sig || !from || !kid || !ts || !cd) {
     return { ok: false, error: "Missing required AgentWorld response headers" }
   }
 
@@ -285,7 +287,7 @@ export function verifyHttpResponseHeaders(
     return { ok: false, error: "Content-Digest mismatch" }
   }
 
-  const signingInput = buildResponseSigningInput({ from, kid, ts, status, contentDigest: cd })
+  const signingInput = buildResponseSigningInput({ v: ver, from, kid, ts, status, contentDigest: cd })
   const ok = verifySignature(publicKeyB64, signingInput, sig)
   return ok ? { ok: true } : { ok: false, error: "Invalid X-AgentWorld-Signature" }
 }

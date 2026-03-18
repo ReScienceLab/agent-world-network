@@ -29,6 +29,7 @@ const {
   canonicalize,
   signHttpRequest,
   verifyHttpRequestHeaders,
+  verifyHttpResponseHeaders,
   computeContentDigest,
 } = await import("../dist/identity.js")
 const { sendP2PMessage } = await import("../dist/peer-client.js")
@@ -275,5 +276,64 @@ describe("v0.2 request signing", () => {
     assert.ok(resp.headers.get("x-agentworld-keyid"))
     assert.ok(resp.headers.get("x-agentworld-timestamp"))
     assert.ok(resp.headers.get("content-digest"))
+  })
+
+  test("computeContentDigest handles empty body", () => {
+    const digest = computeContentDigest("")
+    assert.ok(digest.startsWith("sha-256=:"))
+    assert.ok(digest.endsWith(":"))
+    const inner = digest.slice("sha-256=:".length, -1)
+    assert.ok(inner.length > 0, "digest should not be empty")
+    // SHA-256 of empty string is well-known
+    const expected = crypto.createHash("sha256").update("").digest("base64")
+    assert.equal(inner, expected)
+  })
+
+  test("verifyHttpResponseHeaders validates server response", async () => {
+    const timestamp = Date.now()
+    const payload = {
+      from: senderKey.agentId,
+      publicKey: senderKey.publicKey,
+      event: "chat",
+      content: "verify response",
+      timestamp,
+    }
+    const signature = signMessage(senderKey.privateKey, payload)
+    const msg = { ...payload, signature }
+
+    const resp = await fetch(`http://[::1]:${PORT}/peer/message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(msg),
+    })
+    assert.equal(resp.status, 200)
+    const body = await resp.text()
+    const respHeaders = {}
+    for (const [k, v] of resp.headers.entries()) respHeaders[k] = v
+    const result = verifyHttpResponseHeaders(respHeaders, 200, body, selfKey.publicKey)
+    assert.ok(result.ok, `Response header verification failed: ${result.error}`)
+  })
+
+  test("server rejects v0.2 request with mismatched from header vs body", async () => {
+    const otherKey = makeIdentity()
+    const msgBody = JSON.stringify({
+      from: senderKey.agentId,
+      publicKey: senderKey.publicKey,
+      event: "chat",
+      content: "mismatched from",
+      timestamp: Date.now(),
+      signature: "unused",
+    })
+    // Sign with senderKey but the body says from=senderKey while header will say from=otherKey
+    const awHeaders = signHttpRequest(otherKey, "POST", `[::1]:${PORT}`, "/peer/message", msgBody)
+
+    const resp = await fetch(`http://[::1]:${PORT}/peer/message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...awHeaders },
+      body: msgBody,
+    })
+    // Should fail because header signature was signed with otherKey's publicKey
+    // but body says publicKey=senderKey.publicKey, and verification uses body's publicKey
+    assert.ok(resp.status === 403 || resp.status === 400)
   })
 })

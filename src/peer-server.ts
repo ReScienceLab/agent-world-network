@@ -110,11 +110,16 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
     if (awSig) {
       const rawBody = (req as any).rawBody as string
       const authority = (req.headers["host"] as string) ?? "localhost"
+      const reqPath = req.url.split("?")[0]
       const result = verifyHttpRequestHeaders(
         req.headers as Record<string, string>,
-        req.method, req.url, authority, rawBody, ann.publicKey
+        req.method, reqPath, authority, rawBody, ann.publicKey
       )
       if (!result.ok) return reply.code(403).send({ error: result.error })
+      const headerFrom = req.headers["x-agentworld-from"] as string
+      if (headerFrom !== ann.from) {
+        return reply.code(400).send({ error: "X-AgentWorld-From does not match body 'from'" })
+      }
     } else {
       const { signature, ...signable } = ann
       if (!verifySignature(ann.publicKey, signable as Record<string, unknown>, signature)) {
@@ -172,11 +177,16 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
     if (awSig) {
       const rawBody = (req as any).rawBody as string
       const authority = (req.headers["host"] as string) ?? "localhost"
+      const reqPath = req.url.split("?")[0]
       const result = verifyHttpRequestHeaders(
         req.headers as Record<string, string>,
-        req.method, req.url, authority, rawBody, raw.publicKey
+        req.method, reqPath, authority, rawBody, raw.publicKey
       )
       if (!result.ok) return reply.code(403).send({ error: result.error })
+      const headerFrom = req.headers["x-agentworld-from"] as string
+      if (headerFrom !== raw.from) {
+        return reply.code(400).send({ error: "X-AgentWorld-From does not match body 'from'" })
+      }
     } else {
       const sigData = canonical(raw)
       if (!verifySignature(raw.publicKey, sigData, raw.signature)) {
@@ -226,6 +236,8 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
     return { ok: true }
   })
 
+  // TODO: v0.2 transport-level header signing for /peer/key-rotation is deferred —
+  // rotation uses its own dual-signature proof structure (signedByOld + signedByNew)
   server.post("/peer/key-rotation", async (req, reply) => {
     const rot = req.body as any
 
