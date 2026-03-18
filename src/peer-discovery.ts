@@ -10,7 +10,7 @@
  */
 
 import { Identity, Endpoint } from "./types"
-import { signMessage, agentIdFromPublicKey } from "./identity"
+import { signMessage, agentIdFromPublicKey, signHttpRequest } from "./identity"
 import { listPeers, upsertDiscoveredPeer, getPeersForExchange, pruneStale } from "./peer-db"
 
 const BOOTSTRAP_JSON_URL =
@@ -121,17 +121,18 @@ export async function announceToNode(
   const announcement = { ...payload, signature }
 
   const isIpv6 = targetAddr.includes(":") && !targetAddr.includes(".")
-  const url = isIpv6
-    ? `http://[${targetAddr}]:${port}/peer/announce`
-    : `http://${targetAddr}:${port}/peer/announce`
+  const host = isIpv6 ? `[${targetAddr}]:${port}` : `${targetAddr}:${port}`
+  const url = `http://${host}/peer/announce`
+  const reqBody = JSON.stringify(announcement)
+  const awHeaders = signHttpRequest(identity, "POST", host, "/peer/announce", reqBody)
 
   try {
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), EXCHANGE_TIMEOUT_MS)
     const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(announcement),
+      headers: { "Content-Type": "application/json", ...awHeaders },
+      body: reqBody,
       signal: ctrl.signal,
     })
     clearTimeout(timer)
