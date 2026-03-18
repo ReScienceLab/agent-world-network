@@ -113,8 +113,8 @@ describe("P2a — response signing on /peer/* endpoints", () => {
       body: JSON.stringify({ bad: "payload" }),
     })
     const body = await resp.text()
-    assert.equal(resp.status, 403)
-    const result = verifyResponseSig(resp.headers, 403, body, selfKey.publicKey)
+    assert.equal(resp.status, 400)
+    const result = verifyResponseSig(resp.headers, 400, body, selfKey.publicKey)
     assert.ok(result.ok, `Error response signature invalid: ${JSON.stringify(result)}`)
   })
 })

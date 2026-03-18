@@ -435,7 +435,7 @@ export default function register(api: any) {
         return { content: [{ type: "text", text: "Error: P2P service not started yet." }] }
       }
       const event = params.event ?? "chat"
-      const result = await sendP2PMessage(identity, params.agent_id, event, params.message, params.port ?? peerPort, 10_000, buildSendOpts(params.agent_id))
+      const result = await sendP2PMessage(identity, params.agent_id, event, params.message, params.port ?? 8099, 10_000, buildSendOpts(params.agent_id))
       if (result.ok) {
         return { content: [{ type: "text", text: `Message delivered to ${params.agent_id} (event: ${event})` }] }
       }

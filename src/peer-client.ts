@@ -6,7 +6,7 @@
  *   2. HTTP over TCP (direct fallback)
  */
 import { P2PMessage, Identity, Endpoint } from "./types"
-import { signMessage } from "./identity"
+import { signMessage, signHttpRequest } from "./identity"
 import { Transport } from "./transport"
 
 function buildSignedMessage(identity: Identity, event: string, content: string): P2PMessage {
@@ -24,27 +24,30 @@ function buildSignedMessage(identity: Identity, event: string, content: string):
 
 async function sendViaHttp(
   msg: P2PMessage,
+  identity: Identity,
   targetAddr: string,
   port: number,
   timeoutMs: number,
+  urlPath: string = "/peer/message",
 ): Promise<{ ok: boolean; error?: string }> {
   const isIpv6 = targetAddr.includes(":") && !targetAddr.includes(".")
-  const url = isIpv6
-    ? `http://[${targetAddr}]:${port}/peer/message`
-    : `http://${targetAddr}:${port}/peer/message`
+  const host = isIpv6 ? `[${targetAddr}]:${port}` : `${targetAddr}:${port}`
+  const url = `http://${host}${urlPath}`
+  const body = JSON.stringify(msg)
+  const awHeaders = signHttpRequest(identity, "POST", host, urlPath, body)
   try {
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), timeoutMs)
     const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(msg),
+      headers: { "Content-Type": "application/json", ...awHeaders },
+      body,
       signal: ctrl.signal,
     })
     clearTimeout(timer)
     if (!resp.ok) {
-      const body = await resp.text().catch(() => "")
-      return { ok: false, error: `HTTP ${resp.status}: ${body}` }
+      const text = await resp.text().catch(() => "")
+      return { ok: false, error: `HTTP ${resp.status}: ${text}` }
     }
     return { ok: true }
   } catch (err: any) {
@@ -104,11 +107,11 @@ export async function sendP2PMessage(
       .filter((e) => e.transport === "tcp")
       .sort((a, b) => a.priority - b.priority)[0]
     if (httpEp) {
-      return sendViaHttp(msg, httpEp.address, httpEp.port || port, timeoutMs)
+      return sendViaHttp(msg, identity, httpEp.address, httpEp.port || port, timeoutMs)
     }
   }
 
-  return sendViaHttp(msg, targetAddr, port, timeoutMs)
+  return sendViaHttp(msg, identity, targetAddr, port, timeoutMs)
 }
 
 export async function broadcastLeave(
