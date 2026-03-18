@@ -1,5 +1,75 @@
 # Changelog
 
+## 0.4.0
+
+### Minor Changes
+
+- c7f958c: Agent Worlds Playground — world discovery UI, manifest protocol, and updated web frontend
+- 379c2c9: feat(agentwire-p0): add AgentWire v0.2 HTTP header signing and eliminate gateway crypto duplication
+
+  - Add `signHttpRequest`, `verifyHttpRequestHeaders`, `computeContentDigest` to agent-world-sdk crypto module
+  - Update `peer-protocol.ts` to verify `X-AgentWire-*` headers with backward-compatible body-sig fallback
+  - Update `bootstrap.ts` and `world-server.ts` to send `X-AgentWire-*` headers on all outbound requests
+  - Refactor `gateway/server.mjs` to import crypto and identity from `@resciencelab/agent-world-sdk`, removing ~60 lines of duplicated code
+  - Fix `.gitignore` to properly exclude `.worktrees/` directory
+
+- 379c2c9: feat(agentwire-p1): AgentWire v0.2 agentId namespace + Agent Card
+
+  BREAKING: agentId format changed from 32-char truncated hex to `aw:sha256:<64hex>`.
+  Existing identity files are migrated automatically on next startup.
+  Bootstrap nodes must be redeployed after this release.
+
+  New: GET /.well-known/agent.json — JWS-signed A2A Agent Card with
+  extensions.agentwire block (agentId, identity key, profiles, conformance).
+  Available on gateway (set PUBLIC_URL env) and world agents (set cardUrl config).
+
+- b819b00: feat(p2): response signing, key rotation format, Agent Card ETag + capabilities
+
+  - HTTP response signing: all `/peer/*` JSON responses include `X-AgentWorld-Signature` + `Content-Digest`
+  - Key rotation: structured `agentworld-identity-rotation` format with JWS proofs, top-level `oldAgentId`/`newAgentId`
+  - TOFU guard: key-loss recovery returns 403 (silent overwrite no longer allowed)
+  - Agent Card: `ETag` + `Cache-Control` headers, `conformance.capabilities` array
+  - Protocol version derived from `package.json` instead of hardcoded
+  - Renamed protocol headers from `X-AgentWire-*` to `X-AgentWorld-*`
+  - Renamed card extension key from `extensions.agentwire` to `extensions.agentworld`
+  - Raw request body used for Content-Digest verification (prevents false 403 on re-serialization mismatch)
+  - Malformed `publicKeyMultibase` returns 400 instead of 500
+
+- dcd4f1c: Add UDP socket listener (port 8098) to bootstrap nodes for QUIC peer rendezvous and NAT endpoint discovery
+- a434a0b: Add capability-based peer discovery: findPeersByCapability() with exact and prefix matching, capability filter on p2p_list_peers tool and CLI
+- 0d92856: Rename DeClaw to DAP across the package, plugin IDs, config keys, and public-facing docs.
+- 7512bcc: Add Gateway Server (gateway/server.mjs) — stateless portal with WebSocket bridge connecting DAP network to browsers
+- da658a5: Add list_worlds and join_world agent tools for discovering and joining Agent worlds via DAP
+- dcd4f1c: Add POST /peer/key-rotation endpoint: both old and new Ed25519 keys sign the rotation record, TOFU cache is updated atomically
+- d59aefa: Add @resciencelab/agent-world-sdk — reusable DAP World Agent infrastructure (crypto, identity, peer DB, bootstrap discovery, peer protocol, createWorldServer API)
+- dcd4f1c: Remove Yggdrasil dependency. DAP now uses plain HTTP over TCP as its primary transport (with QUIC as an optional fast transport). This eliminates the need to install and run a Yggdrasil daemon, reducing agent onboarding to installing the plugin only.
+
+  Breaking changes:
+
+  - `PluginConfig.yggdrasil_peers` removed — use `bootstrap_peers` with plain HTTP addresses
+  - `PluginConfig.test_mode` removed — no longer needed
+  - `Identity.cgaIpv6` and `Identity.yggIpv6` removed from the type
+  - `BootstrapNode.yggAddr` replaced with `addr` (plain hostname or IP)
+  - `isYggdrasilAddr()` removed from `peer-server`
+  - `DEFAULT_BOOTSTRAP_PEERS` is now empty — bootstrap addresses will be added to `docs/bootstrap.json` once AWS nodes are configured with public HTTP endpoints
+  - `startup_delay_ms` default reduced from 30s to 5s
+  - `yggdrasil_check` agent tool removed
+  - `openclaw p2p setup` CLI command removed
+
+- f11a846: Add pixel playground web frontend (web/index.html, client.js, style.css) — zero-dependency browser UI for the DAP Agent playground
+- dabed97: Add standalone World Agent server (world/server.mjs) — deployable by anyone to host a world on the DAP network
+- 199404a: Add MAX_AGENTS, WORLD_PUBLIC, WORLD_PASSWORD environment variables to World Agent for capacity limits, private worlds, and password protection
+
+### Patch Changes
+
+- f1ba31b: Configure public HTTP addresses for all 5 AWS bootstrap nodes
+- dcd4f1c: Upgrade bootstrap.json format to include transport endpoint fields (quicAddr, udpPort, httpPort) for future multi-transport bootstrap support
+- dcd4f1c: Expose did:key (W3C DID) in identity CLI output and agent tool response
+- 48042ad: Add TTL-based peer expiry to Gateway and World Agent, active world reachability probing, and PUBLIC_PORT env var support
+- 6601249: Gateway probe rejects endpoints that return no worldId (e.g. Gateway's own peer listener on same port)
+- e05b197: fix: sync agent-world-sdk version with root package in release workflow
+- dcd4f1c: Add TOFU binding TTL (default 7 days) to limit key compromise exposure window
+
 ## 0.3.2
 
 ### Patch Changes
