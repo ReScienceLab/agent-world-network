@@ -27,13 +27,55 @@ export interface BootstrapNode {
   httpPort: number
 }
 
+// ── World manifest types ───────────────────────────────────────────────────────
+
+export interface ActionParamSchema {
+  type: string
+  required?: boolean
+  desc?: string
+  min?: number
+  max?: number
+  enum?: (string | number)[]
+}
+
+export interface ActionSchema {
+  desc: string
+  params?: Record<string, ActionParamSchema>
+  phase?: string[]
+}
+
+export interface WorldRule {
+  id?: string
+  text: string
+  enforced: boolean
+}
+
+export interface HostInfo {
+  agentId: string
+  name?: string
+  description?: string
+  cardUrl?: string
+  endpoints?: Endpoint[]
+}
+
+export interface WorldLifecycle {
+  matchmaking?: "arena" | "free"
+  evictionPolicy?: "idle" | "loser-leaves" | "manual"
+  idleTimeoutMs?: number
+  turnTimeoutMs?: number
+  turnTimeoutAction?: "default-move" | "forfeit"
+}
+
 export interface WorldManifest {
   name: string
+  type?: "programmatic" | "hosted"
   theme?: string
   description?: string
   objective?: string
-  rules?: string[]
-  actions?: Record<string, { params?: Record<string, string>; desc: string }>
+  rules?: WorldRule[] | string[]
+  actions?: Record<string, ActionSchema>
+  host?: HostInfo
+  lifecycle?: WorldLifecycle
   state_fields?: string[]
   [key: string]: unknown
 }
@@ -53,6 +95,14 @@ export interface WorldConfig {
   cardDescription?: string
   worldName?: string
   worldTheme?: string
+  /** World type: "programmatic" (default) or "hosted" */
+  worldType?: "programmatic" | "hosted"
+  /** Hosted mode: Host Agent's agentId */
+  hostAgentId?: string
+  /** Hosted mode: Host Agent's Agent Card URL */
+  hostCardUrl?: string
+  /** Hosted mode: Host Agent's direct endpoints */
+  hostEndpoints?: Endpoint[]
   /** Listen port (default 8099) */
   port?: number
   /** Externally reachable port for DAP announce, may differ in Docker (default = port) */

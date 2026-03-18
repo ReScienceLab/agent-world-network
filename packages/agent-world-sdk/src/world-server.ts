@@ -4,7 +4,7 @@ import { PeerDb } from "./peer-db.js"
 import { registerPeerRoutes } from "./peer-protocol.js"
 import { startDiscovery } from "./bootstrap.js"
 import { canonicalize, signPayload, signHttpRequest } from "./crypto.js"
-import type { WorldConfig, WorldHooks, WorldServer } from "./types.js"
+import type { WorldConfig, WorldHooks, WorldServer, WorldManifest } from "./types.js"
 
 const DEFAULT_BOOTSTRAP_URL = "https://resciencelab.github.io/DAP/bootstrap.json"
 
@@ -27,6 +27,10 @@ export async function createWorldServer(
     worldId,
     worldName = `World (${worldId})`,
     worldTheme = "default",
+    worldType = "programmatic",
+    hostAgentId,
+    hostCardUrl,
+    hostEndpoints,
     port = 8099,
     publicPort,
     publicAddr = null,
@@ -43,6 +47,20 @@ export async function createWorldServer(
     cardName,
     cardDescription,
   } = config
+
+  function enrichManifest(manifest: WorldManifest): WorldManifest {
+    if (worldType !== "hosted" || !hostAgentId) return manifest
+    return {
+      ...manifest,
+      type: "hosted",
+      host: {
+        agentId: hostAgentId,
+        cardUrl: hostCardUrl,
+        endpoints: hostEndpoints,
+        ...manifest.host,
+      },
+    }
+  }
 
   const resolvedPublicPort = publicPort ?? port
 
@@ -86,7 +104,7 @@ export async function createWorldServer(
           }
           agentLastSeen.set(agentId, Date.now())
           const result = await hooks.onJoin(agentId, data)
-          sendReply({ ok: true, worldId, manifest: result.manifest, state: result.state })
+          sendReply({ ok: true, worldId, manifest: enrichManifest(result.manifest), state: result.state })
           console.log(`[world] ${agentId.slice(0, 8)} joined — ${agentLastSeen.size} agents`)
           return
         }
