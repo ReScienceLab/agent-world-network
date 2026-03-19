@@ -12,8 +12,12 @@ import * as path from "path"
 import * as os from "os"
 import { Identity, AwRequestHeaders, AwResponseHeaders } from "./types"
 
+// Protocol version for HTTP signatures and domain separators.
+// Uses major.minor from package.json — only changes on breaking protocol updates.
+// This MUST match the SDK's PROTOCOL_VERSION to allow cross-node signature verification.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { version: PROTOCOL_VERSION } = require("../package.json")
+const pkgVersion: string = require("../package.json").version
+const PROTOCOL_VERSION = pkgVersion.split(".").slice(0, 2).join(".")
 
 // ── did:key mapping ─────────────────────────────────────────────────────────
 
@@ -125,7 +129,51 @@ export function verifySignature(
   }
 }
 
-// ── AgentWorld v0.2 HTTP header signing (§6.6/§6.7) ────────────────────────
+// ── Domain-Separated Signatures ─────────────────────────────────────────────
+
+export const DOMAIN_SEPARATORS = {
+  HTTP_REQUEST: `AgentWorld-Req-${PROTOCOL_VERSION}\0`,
+  HTTP_RESPONSE: `AgentWorld-Res-${PROTOCOL_VERSION}\0`,
+  AGENT_CARD: `AgentWorld-Card-${PROTOCOL_VERSION}\0`,
+  KEY_ROTATION: `AgentWorld-Rotation-${PROTOCOL_VERSION}\0`,
+  ANNOUNCE: `AgentWorld-Announce-${PROTOCOL_VERSION}\0`,
+  MESSAGE: `AgentWorld-Message-${PROTOCOL_VERSION}\0`,
+  WORLD_STATE: `AgentWorld-WorldState-${PROTOCOL_VERSION}\0`,
+} as const
+
+export function signWithDomainSeparator(
+  domainSeparator: string,
+  payload: unknown,
+  secretKey: Uint8Array
+): string {
+  const canonicalJson = JSON.stringify(canonicalize(payload))
+  const domainPrefix = Buffer.from(domainSeparator, "utf8")
+  const payloadBytes = Buffer.from(canonicalJson, "utf8")
+  const message = Buffer.concat([domainPrefix, payloadBytes])
+  const sig = nacl.sign.detached(message, secretKey)
+  return Buffer.from(sig).toString("base64")
+}
+
+export function verifyWithDomainSeparator(
+  domainSeparator: string,
+  publicKeyB64: string,
+  payload: unknown,
+  signatureB64: string
+): boolean {
+  try {
+    const canonicalJson = JSON.stringify(canonicalize(payload))
+    const domainPrefix = Buffer.from(domainSeparator, "utf8")
+    const payloadBytes = Buffer.from(canonicalJson, "utf8")
+    const message = Buffer.concat([domainPrefix, payloadBytes])
+    const pubKey = Buffer.from(publicKeyB64, "base64")
+    const sig = Buffer.from(signatureB64, "base64")
+    return nacl.sign.detached.verify(message, sig, pubKey)
+  } catch {
+    return false
+  }
+}
+
+// ── AgentWorld HTTP header signing ──────────────────────────────────────────
 
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000
 
@@ -178,17 +226,14 @@ export function signHttpRequest(
   const signingInput = buildRequestSigningInput({
     v: PROTOCOL_VERSION, from: identity.agentId, kid, ts, method, authority, path: reqPath, contentDigest,
   })
-  const sig = nacl.sign.detached(
-    Buffer.from(JSON.stringify(canonicalize(signingInput))),
-    privFull.secretKey
-  )
+  const signature = signWithDomainSeparator(DOMAIN_SEPARATORS.HTTP_REQUEST, signingInput, privFull.secretKey)
   return {
     "X-AgentWorld-Version": PROTOCOL_VERSION,
     "X-AgentWorld-From": identity.agentId,
     "X-AgentWorld-KeyId": kid,
     "X-AgentWorld-Timestamp": ts,
     "Content-Digest": contentDigest,
-    "X-AgentWorld-Signature": Buffer.from(sig).toString("base64"),
+    "X-AgentWorld-Signature": signature,
   }
 }
 
@@ -227,7 +272,7 @@ export function verifyHttpRequestHeaders(
   const signingInput = buildRequestSigningInput({
     v: ver, from, kid, ts, method, authority, path: reqPath, contentDigest: cd,
   })
-  const ok = verifySignature(publicKeyB64, signingInput, sig)
+  const ok = verifyWithDomainSeparator(DOMAIN_SEPARATORS.HTTP_REQUEST, publicKeyB64, signingInput, sig)
   return ok ? { ok: true } : { ok: false, error: "Invalid X-AgentWorld-Signature" }
 }
 
@@ -243,17 +288,14 @@ export function signHttpResponse(
   const signingInput = buildResponseSigningInput({
     v: PROTOCOL_VERSION, from: identity.agentId, kid, ts, status, contentDigest,
   })
-  const sig = nacl.sign.detached(
-    Buffer.from(JSON.stringify(canonicalize(signingInput))),
-    privFull.secretKey
-  )
+  const signature = signWithDomainSeparator(DOMAIN_SEPARATORS.HTTP_RESPONSE, signingInput, privFull.secretKey)
   return {
     "X-AgentWorld-Version": PROTOCOL_VERSION,
     "X-AgentWorld-From": identity.agentId,
     "X-AgentWorld-KeyId": kid,
     "X-AgentWorld-Timestamp": ts,
     "Content-Digest": contentDigest,
-    "X-AgentWorld-Signature": Buffer.from(sig).toString("base64"),
+    "X-AgentWorld-Signature": signature,
   }
 }
 
@@ -288,7 +330,7 @@ export function verifyHttpResponseHeaders(
   }
 
   const signingInput = buildResponseSigningInput({ v: ver, from, kid, ts, status, contentDigest: cd })
-  const ok = verifySignature(publicKeyB64, signingInput, sig)
+  const ok = verifyWithDomainSeparator(DOMAIN_SEPARATORS.HTTP_RESPONSE, publicKeyB64, signingInput, sig)
   return ok ? { ok: true } : { ok: false, error: "Invalid X-AgentWorld-Signature" }
 }
 

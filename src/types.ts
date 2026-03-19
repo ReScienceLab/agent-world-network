@@ -79,7 +79,7 @@ export interface PluginConfig {
   tofu_ttl_days?: number
 }
 
-// ── AgentWorld v0.2 HTTP signing headers (§6.6/§6.7) ──────────────────────────
+// ── AgentWorld HTTP signing headers ────────────────────────────────────────────
 
 export interface AwRequestHeaders {
   "X-AgentWorld-Version": string
@@ -99,7 +99,7 @@ export interface AwResponseHeaders {
   "X-AgentWorld-Signature": string
 }
 
-// ── Key rotation (AgentWorld v0.2 §6.10/§10.4) ────────────────────────────────
+// ── Key rotation ──────────────────────────────────────────────────────────────
 
 export interface KeyRotationIdentity {
   agentId: string

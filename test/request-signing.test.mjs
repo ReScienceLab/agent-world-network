@@ -1,10 +1,10 @@
 /**
- * AgentWorld v0.2 request signing — round-trip tests
+ * AgentWorld request signing — round-trip tests
  *
  * Verifies that:
  *   1. sendP2PMessage includes X-AgentWorld-* headers
- *   2. Server verifies v0.2 header signatures correctly
- *   3. Server still accepts legacy body-only signed messages
+ *   2. Server verifies header signatures correctly
+ *   3. Server rejects legacy body-only signed messages (header signatures required)
  *   4. Content-Digest mismatch is rejected
  *   5. Timestamp skew is rejected via headers
  */
@@ -17,7 +17,8 @@ import crypto from "node:crypto"
 
 import { createRequire } from "node:module"
 const require = createRequire(import.meta.url)
-const { version: PROTOCOL_VERSION } = require("../package.json")
+const pkgVersion = require("../package.json").version
+const PROTOCOL_VERSION = pkgVersion.split(".").slice(0, 2).join(".")
 
 const nacl = (await import("tweetnacl")).default
 
@@ -44,9 +45,19 @@ function makeIdentity() {
   return { publicKey: pubB64, privateKey: privB64, agentId }
 }
 
+function sendSignedMsg(port, identity, payload) {
+  const body = JSON.stringify(canonicalize(payload))
+  const awHeaders = signHttpRequest(identity, "POST", `[::1]:${port}`, "/peer/message", body)
+  return fetch(`http://[::1]:${port}/peer/message`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...awHeaders },
+    body,
+  })
+}
+
 let selfKey, senderKey, dataDir
 
-describe("v0.2 request signing", () => {
+describe("request signing", () => {
   before(async () => {
     selfKey = makeIdentity()
     senderKey = makeIdentity()
@@ -147,14 +158,14 @@ describe("v0.2 request signing", () => {
     assert.match(result.error, /skew window/)
   })
 
-  test("sendP2PMessage delivers with v0.2 headers (server accepts)", async () => {
+  test("sendP2PMessage delivers with headers (server accepts)", async () => {
     const result = await sendP2PMessage(
-      senderKey, "::1", "chat", "hello via v0.2", PORT, 5000
+      senderKey, "::1", "chat", "hello via ", PORT, 5000
     )
     assert.ok(result.ok, `Send failed: ${result.error}`)
   })
 
-  test("server accepts legacy body-only signed message (no v0.2 headers)", async () => {
+  test("server rejects legacy body-only signed message (no headers)", async () => {
     const timestamp = Date.now()
     const payload = {
       from: senderKey.agentId,
@@ -171,12 +182,10 @@ describe("v0.2 request signing", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(msg),
     })
-    assert.equal(resp.status, 200)
-    const body = await resp.json()
-    assert.ok(body.ok)
+    assert.equal(resp.status, 403)
   })
 
-  test("server rejects v0.2 request with tampered body", async () => {
+  test("server rejects request with tampered body", async () => {
     const original = JSON.stringify({
       from: senderKey.agentId,
       publicKey: senderKey.publicKey,
@@ -206,7 +215,7 @@ describe("v0.2 request signing", () => {
     assert.match(body.error, /Content-Digest mismatch/)
   })
 
-  test("server rejects v0.2 request signed with wrong key", async () => {
+  test("server rejects request signed with wrong key", async () => {
     const otherKey = makeIdentity()
     const msgBody = JSON.stringify({
       from: senderKey.agentId,
@@ -226,7 +235,7 @@ describe("v0.2 request signing", () => {
     assert.equal(resp.status, 403)
   })
 
-  test("announce with v0.2 headers is accepted", async () => {
+  test("announce with headers is accepted", async () => {
     const timestamp = Date.now()
     const payload = {
       from: senderKey.agentId,
@@ -252,23 +261,18 @@ describe("v0.2 request signing", () => {
     assert.ok(result.ok || result.peers)
   })
 
-  test("response includes v0.2 signing headers", async () => {
+  test("response includes signing headers", async () => {
     const timestamp = Date.now()
-    const payload = {
+    const msg = {
       from: senderKey.agentId,
       publicKey: senderKey.publicKey,
       event: "chat",
       content: "check response headers",
       timestamp,
+      signature: "placeholder",
     }
-    const signature = signMessage(senderKey.privateKey, payload)
-    const msg = { ...payload, signature }
 
-    const resp = await fetch(`http://[::1]:${PORT}/peer/message`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(msg),
-    })
+    const resp = await sendSignedMsg(PORT, senderKey, msg)
     assert.equal(resp.status, 200)
     assert.ok(resp.headers.get("x-agentworld-signature"))
     assert.ok(resp.headers.get("x-agentworld-from"))
@@ -291,21 +295,16 @@ describe("v0.2 request signing", () => {
 
   test("verifyHttpResponseHeaders validates server response", async () => {
     const timestamp = Date.now()
-    const payload = {
+    const msg = {
       from: senderKey.agentId,
       publicKey: senderKey.publicKey,
       event: "chat",
       content: "verify response",
       timestamp,
+      signature: "placeholder",
     }
-    const signature = signMessage(senderKey.privateKey, payload)
-    const msg = { ...payload, signature }
 
-    const resp = await fetch(`http://[::1]:${PORT}/peer/message`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(msg),
-    })
+    const resp = await sendSignedMsg(PORT, senderKey, msg)
     assert.equal(resp.status, 200)
     const body = await resp.text()
     const respHeaders = {}
@@ -314,7 +313,7 @@ describe("v0.2 request signing", () => {
     assert.ok(result.ok, `Response header verification failed: ${result.error}`)
   })
 
-  test("server rejects v0.2 request with mismatched from header vs body", async () => {
+  test("server rejects request with mismatched from header vs body", async () => {
     const otherKey = makeIdentity()
     const msgBody = JSON.stringify({
       from: senderKey.agentId,

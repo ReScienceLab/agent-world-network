@@ -10,9 +10,10 @@
  */
 import Fastify, { FastifyInstance } from "fastify"
 import { P2PMessage, Identity, Endpoint } from "./types"
-import { verifySignature, agentIdFromPublicKey, verifyHttpRequestHeaders, signHttpResponse as signHttpResponseFn } from "./identity"
+import { agentIdFromPublicKey, verifyHttpRequestHeaders, signHttpResponse as signHttpResponseFn, DOMAIN_SEPARATORS, verifyWithDomainSeparator } from "./identity"
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { version: PROTOCOL_VERSION } = require("../package.json")
+const pkgVersion: string = require("../package.json").version
+const PROTOCOL_VERSION = pkgVersion.split(".").slice(0, 2).join(".")
 import { tofuVerifyAndCache, tofuReplaceKey, getPeersForExchange, upsertDiscoveredPeer, removePeer, getPeer } from "./peer-db"
 
 const MAX_MESSAGE_AGE_MS = 5 * 60 * 1000 // 5 minutes
@@ -67,7 +68,7 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
 
   server = Fastify({ logger: false })
 
-  // Preserve raw body string for Content-Digest verification (v0.2 §6.6)
+  // Preserve raw body string for Content-Digest verification
   server.decorateRequest("rawBody", "")
   server.addContentTypeParser(
     "application/json",
@@ -82,7 +83,7 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
     }
   )
 
-  // Sign all /peer/* JSON responses (P2a — AgentWorld v0.2 response signing)
+  // Sign all /peer/* JSON responses
   server.addHook("onSend", async (_req, reply, payload) => {
     if (!_identity || typeof payload !== "string") return payload
     const url = ((_req as any).url ?? "").split("?")[0] as string
@@ -105,26 +106,18 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
       return reply.code(400).send({ error: "Missing 'from' or 'publicKey'" })
     }
 
-    // Dual-mode: prefer v0.2 header signature, fall back to body signature
-    const awSig = req.headers["x-agentworld-signature"]
-    if (awSig) {
-      const rawBody = (req as any).rawBody as string
-      const authority = (req.headers["host"] as string) ?? "localhost"
-      const reqPath = req.url.split("?")[0]
-      const result = verifyHttpRequestHeaders(
-        req.headers as Record<string, string>,
-        req.method, reqPath, authority, rawBody, ann.publicKey
-      )
-      if (!result.ok) return reply.code(403).send({ error: result.error })
-      const headerFrom = req.headers["x-agentworld-from"] as string
-      if (headerFrom !== ann.from) {
-        return reply.code(400).send({ error: "X-AgentWorld-From does not match body 'from'" })
-      }
-    } else {
-      const { signature, ...signable } = ann
-      if (!verifySignature(ann.publicKey, signable as Record<string, unknown>, signature)) {
-        return reply.code(403).send({ error: "Invalid announcement signature" })
-      }
+    // Verify X-AgentWorld-* header signature
+    const rawBody = (req as any).rawBody as string
+    const authority = (req.headers["host"] as string) ?? "localhost"
+    const reqPath = req.url.split("?")[0]
+    const result = verifyHttpRequestHeaders(
+      req.headers as Record<string, string>,
+      req.method, reqPath, authority, rawBody, ann.publicKey
+    )
+    if (!result.ok) return reply.code(403).send({ error: result.error })
+    const headerFrom = req.headers["x-agentworld-from"] as string
+    if (headerFrom !== ann.from) {
+      return reply.code(400).send({ error: "X-AgentWorld-From does not match body 'from'" })
     }
 
     const agentId: string = ann.from
@@ -172,26 +165,18 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
       return reply.code(400).send({ error: "Missing 'from' or 'publicKey'" })
     }
 
-    // Dual-mode: prefer v0.2 header signature, fall back to body signature
-    const awSig = req.headers["x-agentworld-signature"]
-    if (awSig) {
-      const rawBody = (req as any).rawBody as string
-      const authority = (req.headers["host"] as string) ?? "localhost"
-      const reqPath = req.url.split("?")[0]
-      const result = verifyHttpRequestHeaders(
-        req.headers as Record<string, string>,
-        req.method, reqPath, authority, rawBody, raw.publicKey
-      )
-      if (!result.ok) return reply.code(403).send({ error: result.error })
-      const headerFrom = req.headers["x-agentworld-from"] as string
-      if (headerFrom !== raw.from) {
-        return reply.code(400).send({ error: "X-AgentWorld-From does not match body 'from'" })
-      }
-    } else {
-      const sigData = canonical(raw)
-      if (!verifySignature(raw.publicKey, sigData, raw.signature)) {
-        return reply.code(403).send({ error: "Invalid Ed25519 signature" })
-      }
+    // Verify X-AgentWorld-* header signature
+    const rawBody = (req as any).rawBody as string
+    const authority = (req.headers["host"] as string) ?? "localhost"
+    const reqPath = req.url.split("?")[0]
+    const result = verifyHttpRequestHeaders(
+      req.headers as Record<string, string>,
+      req.method, reqPath, authority, rawBody, raw.publicKey
+    )
+    if (!result.ok) return reply.code(403).send({ error: result.error })
+    const headerFrom = req.headers["x-agentworld-from"] as string
+    if (headerFrom !== raw.from) {
+      return reply.code(400).send({ error: "X-AgentWorld-From does not match body 'from'" })
     }
 
     const agentId: string = raw.from
@@ -236,7 +221,7 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
     return { ok: true }
   })
 
-  // TODO: v0.2 transport-level header signing for /peer/key-rotation is deferred —
+  // TODO: transport-level header signing for /peer/key-rotation is deferred —
   // rotation uses its own dual-signature proof structure (signedByOld + signedByNew)
   server.post("/peer/key-rotation", async (req, reply) => {
     const rot = req.body as any
@@ -277,11 +262,11 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
       timestamp,
     }
 
-    if (!verifySignature(oldPublicKeyB64, signable, rot.proofs.signedByOld.signature)) {
+    if (!verifyWithDomainSeparator(DOMAIN_SEPARATORS.KEY_ROTATION, oldPublicKeyB64, signable, rot.proofs.signedByOld.signature)) {
       return reply.code(403).send({ error: "Invalid signatureByOldKey" })
     }
 
-    if (!verifySignature(newPublicKeyB64, signable, rot.proofs.signedByNew.signature)) {
+    if (!verifyWithDomainSeparator(DOMAIN_SEPARATORS.KEY_ROTATION, newPublicKeyB64, signable, rot.proofs.signedByNew.signature)) {
       return reply.code(403).send({ error: "Invalid signatureByNewKey" })
     }
 
@@ -338,8 +323,8 @@ export function handleUdpMessage(data: Buffer, from: string): boolean {
     return false
   }
 
-  const sigData = canonical(raw)
-  if (!verifySignature(raw.publicKey, sigData, raw.signature)) {
+  const { signature, ...signable } = raw
+  if (!verifyWithDomainSeparator(DOMAIN_SEPARATORS.MESSAGE, raw.publicKey, signable, signature)) {
     return false
   }
 

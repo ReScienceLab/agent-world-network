@@ -142,10 +142,51 @@ export interface WorldServer {
   /** Underlying Fastify instance — register additional routes here */
   fastify: import("fastify").FastifyInstance
   identity: Identity
+  /** Append-only event ledger for agent activity */
+  ledger: import("./world-ledger.js").WorldLedger
   stop(): Promise<void>
 }
 
-// ── Key rotation (AgentWorld v0.2 §6.10/§10.4) ────────────────────────────────
+// ── World Ledger (append-only event log) ───────────────────────────────────────
+
+export type LedgerEvent =
+  | "world.genesis"
+  | "world.join"
+  | "world.leave"
+  | "world.evict"
+  | "world.action"
+
+export interface LedgerEntry {
+  seq: number
+  prevHash: string
+  timestamp: number
+  event: LedgerEvent
+  agentId: string
+  alias?: string
+  data?: Record<string, unknown>
+  hash: string
+  worldSig: string
+}
+
+export interface AgentSummary {
+  agentId: string
+  alias: string
+  firstSeen: number
+  lastSeen: number
+  actions: number
+  joins: number
+  online: boolean
+}
+
+export interface LedgerQueryOpts {
+  agentId?: string
+  event?: LedgerEvent | LedgerEvent[]
+  since?: number
+  until?: number
+  limit?: number
+}
+
+// ── Key rotation ──────────────────────────────────────────────────────────────
 
 export interface KeyRotationIdentity {
   agentId: string
