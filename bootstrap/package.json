@@ -1,6 +1,6 @@
 {
   "name": "dap-bootstrap",
-  "version": "1.0.0",
+  "version": "0.5.0",
   "type": "module",
   "description": "DAP standalone bootstrap peer exchange server",
   "main": "server.mjs",

@@ -27,6 +27,14 @@
         "default": 8098,
         "description": "Local port for the QUIC/UDP transport (optional fast transport)"
       },
+      "advertise_address": {
+        "type": "string",
+        "description": "Public IP or DNS name to advertise for the QUIC/UDP transport when the listener is bound to a different local interface"
+      },
+      "advertise_port": {
+        "type": "integer",
+        "description": "Public UDP port to advertise for the QUIC/UDP transport when it differs from the local listener port"
+      },
       "data_dir": {
         "type": "string",
         "description": "Directory to store identity and peer data (default: ~/.openclaw/dap)"
@@ -50,6 +58,14 @@
     "quic_port": {
       "label": "QUIC Transport Port (UDP)",
       "placeholder": "8098"
+    },
+    "advertise_address": {
+      "label": "Advertised QUIC Address",
+      "placeholder": "vpn.example.com"
+    },
+    "advertise_port": {
+      "label": "Advertised QUIC Port",
+      "placeholder": "4433"
     },
     "data_dir": {
       "label": "Data Directory"

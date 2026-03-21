@@ -23,7 +23,7 @@ function clearModuleCache() {
 
 function createHarness({
   firstRun = false,
-  pingInfo = { ok: true, data: { agentId: "aw:sha256:world-host" } },
+  pingInfo = { ok: true, data: { agentId: "aw:sha256:world-host", publicKey: "d29ybGQtcHVibGljLWtleQ==" } },
   joinResponse = { ok: true, data: { worldId: "arena", manifest: { name: "Arena" }, members: [] } },
   fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ members: [] }) }),
 } = {}) {
@@ -268,7 +268,7 @@ describe("plugin lifecycle", () => {
   it("stores direct world joins under the world agent ID", async () => {
     const worldAgentId = "aw:sha256:world-host"
     const harness = createHarness({
-      pingInfo: { ok: true, data: { agentId: worldAgentId } },
+      pingInfo: { ok: true, data: { agentId: worldAgentId, publicKey: "d29ybGQtcHVibGljLWtleQ==" } },
       joinResponse: {
         ok: true,
         data: {
@@ -311,7 +311,7 @@ describe("plugin lifecycle", () => {
     const worldAgentId = "aw:sha256:world-host"
     let refreshCalls = 0
     const harness = createHarness({
-      pingInfo: { ok: true, data: { agentId: worldAgentId } },
+      pingInfo: { ok: true, data: { agentId: worldAgentId, publicKey: "d29ybGQtcHVibGljLWtleQ==" } },
       joinResponse: {
         ok: true,
         data: {

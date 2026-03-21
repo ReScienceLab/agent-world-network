@@ -17,7 +17,7 @@ import crypto from "node:crypto";
 import { createRequire } from "node:module";
 
 const __require = createRequire(import.meta.url);
-const pkgVersion = __require("../package.json").version;
+const pkgVersion = __require("./package.json").version;
 const PROTOCOL_VERSION = pkgVersion.split(".").slice(0, 2).join(".");
 
 const PORT = parseInt(process.env.PEER_PORT ?? "8099");

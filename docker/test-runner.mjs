@@ -5,7 +5,7 @@
  * NODE_ROLE=server  — starts peer server, waits for a message, exits 0 on success
  * NODE_ROLE=client  — waits for server, sends one message, exits 0 on success
  */
-import { loadOrCreateIdentity, getPublicIPv6 } from "./dist/identity.js";
+import { loadOrCreateIdentity } from "./dist/identity.js";
 import { initDb } from "./dist/peer-db.js";
 import { startPeerServer, getInbox } from "./dist/peer-server.js";
 import { sendP2PMessage } from "./dist/peer-client.js";
@@ -28,13 +28,7 @@ mkdirSync(DATA_DIR, { recursive: true });
 const identity = loadOrCreateIdentity(DATA_DIR);
 initDb(DATA_DIR);
 
-const publicIpv6 = getPublicIPv6();
 console.log(`[${ROLE}] Identity: ${identity.agentId.slice(0, 8)}...`);
-if (publicIpv6) {
-  console.log(`[${ROLE}] IPv6:     ${publicIpv6}`);
-} else {
-  console.warn(`[${ROLE}] WARNING: no globally-routable IPv6 found — using container IPv6`);
-}
 
 // ── SERVER ──────────────────────────────────────────────────────────────────
 if (ROLE === "server") {

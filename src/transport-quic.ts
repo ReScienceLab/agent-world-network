@@ -4,25 +4,20 @@
  * IMPORTANT: This is a plain UDP datagram transport, NOT a real QUIC
  * implementation. It provides:
  *   - Unencrypted, unreliable UDP delivery (no retransmission, no ordering)
- *   - STUN-assisted NAT traversal for public endpoint discovery
  *   - Messages >MTU (~1400 bytes) may be silently dropped
+ *
+ * The advertised public endpoint is determined by explicit configuration
+ * (ADVERTISE_ADDRESS / ADVERTISE_PORT env vars or plugin config), not by
+ * automatic NIC scanning or STUN. This is intentional: in the world-scoped
+ * architecture, reachable addresses are a deployment concern.
  *
  * Security relies entirely on the application-layer Ed25519 signatures.
  * When Node.js native QUIC (node:quic, Node 24+) becomes stable, this
  * transport should be upgraded to use it for transport-layer encryption.
  */
 import * as dgram from "node:dgram"
-import * as net from "node:net"
 import { Transport, TransportId, TransportEndpoint } from "./transport"
 import { Identity } from "./types"
-import { getActualIpv6, getPublicIPv6 } from "./identity"
-
-/** Well-known public STUN servers for NAT traversal. */
-const STUN_SERVERS = [
-  "stun.l.google.com:19302",
-  "stun1.l.google.com:19302",
-  "stun.cloudflare.com:3478",
-]
 
 /** Check if Node.js native QUIC is available (node:quic, Node 24+). */
 function isNativeQuicAvailable(): boolean {
@@ -32,103 +27,6 @@ function isNativeQuicAvailable(): boolean {
   } catch {
     return false
   }
-}
-
-/**
- * Perform a simple STUN binding request to discover our public IP:port.
- * Returns null if STUN fails (e.g., no internet, firewall).
- */
-async function stunDiscover(
-  socket: dgram.Socket,
-  stunServer: string,
-  timeoutMs: number = 5000
-): Promise<{ address: string; port: number } | null> {
-  const [host, portStr] = stunServer.split(":")
-  const port = parseInt(portStr, 10)
-
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(null), timeoutMs)
-
-    // STUN Binding Request (RFC 5389 minimal)
-    // Magic cookie: 0x2112A442
-    const txId = Buffer.alloc(12)
-    for (let i = 0; i < 12; i++) txId[i] = Math.floor(Math.random() * 256)
-
-    const msg = Buffer.alloc(20)
-    msg.writeUInt16BE(0x0001, 0) // Binding Request
-    msg.writeUInt16BE(0x0000, 2) // Message Length
-    msg.writeUInt32BE(0x2112a442, 4) // Magic Cookie
-    txId.copy(msg, 8)
-
-    const onMessage = (data: Buffer) => {
-      clearTimeout(timer)
-      socket.removeListener("message", onMessage)
-
-      // Parse XOR-MAPPED-ADDRESS from STUN response
-      const parsed = parseStunResponse(data)
-      resolve(parsed)
-    }
-
-    socket.on("message", onMessage)
-
-    // Resolve STUN server hostname before sending
-    require("node:dns").lookup(host, { family: 4 }, (err: Error | null, address: string) => {
-      if (err) {
-        clearTimeout(timer)
-        socket.removeListener("message", onMessage)
-        resolve(null)
-        return
-      }
-      socket.send(msg, 0, msg.length, port, address)
-    })
-  })
-}
-
-/** Parse a STUN Binding Response to extract the mapped address. */
-function parseStunResponse(data: Buffer): { address: string; port: number } | null {
-  if (data.length < 20) return null
-
-  const msgType = data.readUInt16BE(0)
-  if (msgType !== 0x0101) return null // Not a Binding Success Response
-
-  const msgLen = data.readUInt16BE(2)
-  let offset = 20
-
-  while (offset < 20 + msgLen) {
-    const attrType = data.readUInt16BE(offset)
-    const attrLen = data.readUInt16BE(offset + 2)
-    offset += 4
-
-    // XOR-MAPPED-ADDRESS (0x0020) or MAPPED-ADDRESS (0x0001)
-    if (attrType === 0x0020 && attrLen >= 8) {
-      const family = data[offset + 1]
-      if (family === 0x01) { // IPv4
-        const xPort = data.readUInt16BE(offset + 2) ^ 0x2112
-        const xAddr = data.readUInt32BE(offset + 4) ^ 0x2112a442
-        const a = (xAddr >>> 24) & 0xff
-        const b = (xAddr >>> 16) & 0xff
-        const c = (xAddr >>> 8) & 0xff
-        const d = xAddr & 0xff
-        return { address: `${a}.${b}.${c}.${d}`, port: xPort }
-      }
-    } else if (attrType === 0x0001 && attrLen >= 8) {
-      const family = data[offset + 1]
-      if (family === 0x01) { // IPv4
-        const port = data.readUInt16BE(offset + 2)
-        const a = data[offset + 4]
-        const b = data[offset + 5]
-        const c = data[offset + 6]
-        const d = data[offset + 7]
-        return { address: `${a}.${b}.${c}.${d}`, port }
-      }
-    }
-
-    offset += attrLen
-    // Pad to 4-byte boundary
-    if (attrLen % 4 !== 0) offset += 4 - (attrLen % 4)
-  }
-
-  return null
 }
 
 export class UDPTransport implements Transport {
@@ -152,6 +50,14 @@ export class UDPTransport implements Transport {
   async start(identity: Identity, opts?: Record<string, unknown>): Promise<boolean> {
     const port = (opts?.quicPort as number) ?? 8098
     const testMode = (opts?.testMode as boolean) ?? false
+    const advertiseAddress = (opts?.advertiseAddress as string | undefined) ?? process.env.ADVERTISE_ADDRESS
+    const advertisePort = (opts?.advertisePort as number | undefined)
+      ?? (process.env.ADVERTISE_PORT ? parseInt(process.env.ADVERTISE_PORT, 10) : undefined)
+
+    if (!testMode && !advertiseAddress) {
+      console.warn("[transport:quic] Disabled: no advertised public endpoint configured (set ADVERTISE_ADDRESS / advertise_address)")
+      return false
+    }
 
     // Check for native QUIC support first
     this._useNativeQuic = isNativeQuicAvailable()
@@ -182,67 +88,21 @@ export class UDPTransport implements Transport {
         }
       })
 
-      // Check for native public IPv6 first — globally routable, no STUN needed.
-      // When universal IPv6 is available this becomes the primary path.
-      if (!testMode) {
-        const publicIpv6 = getPublicIPv6()
-        if (publicIpv6) {
-          this._address = `[${publicIpv6}]:${actualPort}`
-          this._publicEndpoint = { address: publicIpv6, port: actualPort }
-          console.log(`[transport:quic] Native public IPv6: ${this._address} (STUN skipped)`)
-        }
+      // Use explicit advertise address if configured
+      if (!testMode && advertiseAddress) {
+        const effPort = advertisePort ?? actualPort
+        const isIpv6 = advertiseAddress.includes(":") && !advertiseAddress.includes(".")
+        this._address = isIpv6 ? `[${advertiseAddress}]:${effPort}` : `${advertiseAddress}:${effPort}`
+        this._publicEndpoint = { address: advertiseAddress, port: effPort }
+        console.log(`[transport:quic] Advertised endpoint: ${this._address}`)
       }
 
-      // Try STUN discovery for IPv4 public endpoint only if no public IPv6 found.
-      // We also create a companion IPv4 UDP socket on the same port so the
-      // STUN-mapped port matches the port we are actually listening on.
-      if (!testMode && !this._address) {
-        let stunSocket: dgram.Socket | null = null
-        try {
-          stunSocket = dgram.createSocket("udp4")
-          await new Promise<void>((resolve, reject) => {
-            stunSocket!.on("error", reject)
-            stunSocket!.bind(actualPort, () => {
-              stunSocket!.removeListener("error", reject)
-              resolve()
-            })
-          })
-        } catch {
-          // Port already taken on IPv4 — fall back to ephemeral port
-          try { stunSocket?.close() } catch { /* ignore */ }
-          stunSocket = dgram.createSocket("udp4")
-          await new Promise<void>((resolve, reject) => {
-            stunSocket!.on("error", reject)
-            stunSocket!.bind(0, () => {
-              stunSocket!.removeListener("error", reject)
-              resolve()
-            })
-          }).catch(() => { stunSocket = null })
-        }
-
-        if (stunSocket) {
-          for (const server of STUN_SERVERS) {
-            try {
-              const result = await stunDiscover(stunSocket, server, 3000)
-              if (result) {
-                this._publicEndpoint = result
-                // Use STUN-discovered public IP but always advertise the actual
-                // listening port (in case STUN socket was ephemeral).
-                this._address = `${result.address}:${actualPort}`
-                console.log(`[transport:quic] Public endpoint: ${this._address} (via ${server})`)
-                break
-              }
-            } catch { /* try next */ }
-          }
-          try { stunSocket.close() } catch { /* ignore */ }
-        }
-      }
-
-      // Fallback to local address if STUN failed
+      // Tests can run without a public endpoint; production cannot.
       if (!this._address) {
-        const localIp = getActualIpv6() ?? "::1"
-        this._address = `[${localIp}]:${actualPort}`
-        console.log(`[transport:quic] Local endpoint: ${this._address} (STUN unavailable)`)
+        this._address = `[::1]:${actualPort}`
+        if (!testMode) {
+          console.log(`[transport:quic] Local endpoint: ${this._address} (set ADVERTISE_ADDRESS for public reachability)`)
+        }
       }
 
       this._active = true
@@ -288,8 +148,8 @@ export class UDPTransport implements Transport {
   getEndpoint(): TransportEndpoint {
     return {
       transport: "quic",
-      address: this._address,
-      port: this._port,
+      address: this._publicEndpoint?.address ?? this._address,
+      port: this._publicEndpoint?.port ?? this._port,
       priority: 0,
       ttl: 3600,
     }
@@ -314,4 +174,4 @@ function parseHostPort(addr: string): { host: string; port: number } {
   throw new Error(`Invalid address format: ${addr}`)
 }
 
-export { parseHostPort, isNativeQuicAvailable, stunDiscover, parseStunResponse }
+export { parseHostPort, isNativeQuicAvailable }

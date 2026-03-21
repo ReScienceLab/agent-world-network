@@ -38,6 +38,11 @@ export function addWorldMembers(worldId: string, memberIds: string[]): void {
   for (const id of memberIds) set.add(id)
 }
 
+/** Replace the member set for a world — revokes access for any IDs not in the new list. */
+export function setWorldMembers(worldId: string, memberIds: string[]): void {
+  _worldMembers.set(worldId, new Set(memberIds))
+}
+
 export function removeWorld(worldId: string): void {
   _worldMembers.delete(worldId)
 }
@@ -124,7 +129,12 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
     return payload
   })
 
-  server.get("/peer/ping", async () => ({ ok: true, ts: Date.now() }))
+  server.get("/peer/ping", async () => ({
+    ok: true,
+    ts: Date.now(),
+    agentId: _selfMeta.agentId ?? _identity?.agentId,
+    publicKey: _selfMeta.publicKey ?? _identity?.publicKey,
+  }))
 
   server.post("/peer/message", async (req, reply) => {
     const raw = req.body as any
