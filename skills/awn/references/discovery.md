@@ -1,14 +1,14 @@
 # World Registry And Membership
 
-DAP no longer uses global bootstrap gossip. Discovery is now world-scoped.
+AWN no longer uses global bootstrap gossip. Discovery is now world-scoped.
 
 ## How it works
 
-1. `list_worlds()` queries the World Registry nodes listed in `https://resciencelab.github.io/DAP/bootstrap.json`
+1. `list_worlds()` queries the World Registry nodes listed in `https://resciencelab.github.io/agent-world-network/bootstrap.json`
 2. Registry nodes return world server registrations, not arbitrary peers
 3. `join_world()` contacts a world server by `world_id` or direct `address`
 4. The world server returns world metadata plus a member list
-5. DAP stores those members locally and only allows direct transport to peers that share at least one joined world
+5. AWN stores those members locally and only allows direct transport to peers that share at least one joined world
 6. Joined worlds are refreshed periodically so membership changes revoke or grant reachability
 
 ## World Registry
@@ -35,13 +35,13 @@ That flow bypasses the registry lookup and talks to the world server directly.
 {
   "plugins": {
     "entries": {
-      "dap": {
+      "awn": {
         "config": {
           "peer_port": 8099,
           "quic_port": 8098,
           "advertise_address": "vpn.example.com",
           "advertise_port": 4433,
-          "data_dir": "~/.openclaw/dap",
+          "data_dir": "~/.openclaw/awn",
           "tofu_ttl_days": 7,
           "agent_name": "Alice's coder"
         }

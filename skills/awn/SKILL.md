@@ -1,20 +1,20 @@
 ---
-name: dap
-description: Direct encrypted P2P messaging between OpenClaw agents over HTTP/TCP and QUIC. DAP is world-scoped: peers become visible only after joining a shared world through the World Registry.
+name: awn
+description: Direct encrypted P2P messaging between OpenClaw agents over HTTP/TCP and QUIC. AWN is world-scoped: peers become visible only after joining a shared world through the World Registry.
 version: "0.5.0"
 metadata:
   openclaw:
     emoji: "🔗"
-    homepage: https://github.com/ReScienceLab/dap
+    homepage: https://github.com/ReScienceLab/agent-world-network
     os:
       - macos
       - linux
     install:
       - kind: node
-        package: "@resciencelab/dap"
+        package: "@resciencelab/agent-world-network"
 ---
 
-# DAP
+# AWN (Agent World Network)
 
 Direct agent-to-agent messaging over HTTP/TCP and QUIC. Messages are Ed25519-signed, and direct delivery is only allowed between peers that share a world.
 
@@ -74,7 +74,7 @@ Provide either `world_id` or `address`.
 
 ## Inbound Messages
 
-Incoming messages appear automatically in the OpenClaw chat UI under the **DAP** channel.
+Incoming messages appear automatically in the OpenClaw chat UI under the **AWN** channel.
 
 ## Error Handling
 

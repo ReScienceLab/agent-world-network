@@ -1,5 +1,5 @@
 ---
-"@resciencelab/dap": minor
+"@resciencelab/agent-world-network": minor
 ---
 
 feat!: transport-layer enforcement of world-scoped isolation

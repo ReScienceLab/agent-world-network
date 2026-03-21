@@ -1,19 +1,19 @@
-# DAP Installation Guide
+# AWN Installation Guide
 
-DAP has no external binary dependencies. It runs over HTTP/TCP and optional QUIC, with Ed25519 signing built into the plugin.
+AWN has no external binary dependencies. It runs over HTTP/TCP and optional QUIC, with Ed25519 signing built into the plugin.
 
 ---
 
 ## Install via npm
 
 ```bash
-npm install @resciencelab/dap
+npm install @resciencelab/agent-world-network
 ```
 
 Or via OpenClaw:
 
 ```bash
-openclaw plugins install @resciencelab/dap
+openclaw plugins install @resciencelab/agent-world-network
 ```
 
 ---

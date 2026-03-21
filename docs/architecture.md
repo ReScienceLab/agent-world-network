@@ -1,4 +1,4 @@
-# DAP Architecture: World-Scoped Discovery + Transport Enforcement
+# AWN Architecture: World-Scoped Discovery + Transport Enforcement
 
 > **Status**: Implemented
 > **Date**: 2026-03-21
@@ -148,7 +148,7 @@ Capability filtering still exists, but it is applied to peers already known thro
 
 ### 4.1 Transport Interface
 
-`src/transport.ts` defines the transport abstraction used by DAP:
+`src/transport.ts` defines the transport abstraction used by AWN:
 
 - transport identity (`quic`, `tcp`, future transports)
 - startup / shutdown lifecycle
@@ -168,7 +168,7 @@ Key properties:
 - `ADVERTISE_PORT` / `advertise_port` overrides the advertised UDP port when needed
 - no automatic public-endpoint discovery
 
-If no advertised public endpoint is configured, QUIC is disabled and DAP continues in HTTP/TCP-only mode.
+If no advertised public endpoint is configured, QUIC is disabled and AWN continues in HTTP/TCP-only mode.
 
 ### 4.3 HTTP/TCP Fallback
 
@@ -190,7 +190,7 @@ This is the universal fallback path and the default world-join transport.
 1. Load or create Ed25519 keypair -> derive agentId
 2. Initialize peer DB and TOFU TTL
 3. Start transport manager and optional QUIC transport
-4. Start HTTP peer server and register tools + DAP channel
+4. Start HTTP peer server and register tools + AWN channel
 5. No automatic bootstrap runs at startup; agent uses list_worlds / join_world tools
 6. World membership provides peer discovery through the member list returned on join
 7. World membership refresh keeps the routing table current every 30 seconds

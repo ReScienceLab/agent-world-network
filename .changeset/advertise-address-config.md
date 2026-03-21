@@ -1,5 +1,5 @@
 ---
-"@resciencelab/dap": patch
+"@resciencelab/agent-world-network": patch
 ---
 
 fix: replace IPv6/STUN with ADVERTISE_ADDRESS + Codex P1 fixes

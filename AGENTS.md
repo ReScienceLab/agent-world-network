@@ -1,4 +1,4 @@
-# DAP
+# AWN (Agent World Network)
 
 OpenClaw plugin for direct P2P communication between agent instances over plain HTTP/TCP and optional QUIC. Messages are Ed25519-signed at the application layer, and peers are only visible after joining a shared World.
 
@@ -8,7 +8,7 @@ OpenClaw plugin for direct P2P communication between agent instances over plain 
 - Run tests: `node --test test/*.test.mjs`
 - Dev (watch mode): `npm run dev`
 - Add changeset: `npx changeset add`
-- Publish skill to ClawHub: `npx clawhub@latest publish skills/dap`
+- Publish skill to ClawHub: `npx clawhub@latest publish skills/awn`
 
 Always run build before tests — tests import from `dist/`.
 
@@ -31,7 +31,7 @@ Always run build before tests — tests import from `dist/`.
 │   ├── server.mjs              → World Registry server (deployed on AWS)
 │   ├── Dockerfile              → node:22-alpine container
 │   └── package.json            → Minimal deps (no TypeScript)
-├── skills/dap/              → ClawHub skill definition
+├── skills/awn/              → ClawHub skill definition
 │   ├── SKILL.md                → Skill frontmatter + tool docs
 │   └── references/             → Supplementary docs (flows, discovery, install)
 ├── docs/                       → GitHub Pages assets
@@ -42,10 +42,10 @@ Always run build before tests — tests import from `dist/`.
 
 ## Architecture Overview
 
-Plugin registers a background service (`dap-node`) that:
-1. Loads/creates an Ed25519 identity (`~/.openclaw/dap/identity.json`)
+Plugin registers a background service (`awn-node`) that:
+1. Loads/creates an Ed25519 identity (`~/.openclaw/awn/identity.json`)
 2. Starts a Fastify peer server on `[::]:8099`
-3. Registers tools (`p2p_status`, `p2p_list_peers`, `p2p_send_message`, `list_worlds`, `join_world`) and the DAP channel
+3. Registers tools (`p2p_status`, `p2p_list_peers`, `p2p_send_message`, `list_worlds`, `join_world`) and the AWN channel
 4. Discovers worlds via `list_worlds()` and joins them via `join_world()`
 5. World membership provides peer discovery — co-members' endpoints arrive from the world server on join
 6. Runs periodic member refresh (30s) to keep world membership current
@@ -65,14 +65,14 @@ Trust model (4-layer):
 - Tests import from `dist/` — always `npm run build` first
 
 ### Plugin Config
-All runtime config is in `openclaw.json` under `plugins.entries.dap.config`:
+All runtime config is in `openclaw.json` under `plugins.entries.awn.config`:
 ```json
 {
   "peer_port": 8099,
   "quic_port": 8098,
   "advertise_address": "vpn.example.com",
   "advertise_port": 4433,
-  "data_dir": "~/.openclaw/dap",
+  "data_dir": "~/.openclaw/awn",
   "tofu_ttl_days": 7,
   "agent_name": "Alice's coder"
 }
@@ -159,7 +159,7 @@ When creating new issues:
 
 ### How Releases Work (Changesets)
 
-DAP uses [Changesets](https://github.com/changesets/changesets) for automated versioning and publishing. The flow aligns with mastra, langchain, and other major TypeScript projects.
+AWN uses [Changesets](https://github.com/changesets/changesets) for automated versioning and publishing. The flow aligns with mastra, langchain, and other major TypeScript projects.
 
 **Step 1 — When opening a PR, add a changeset:**
 
@@ -173,7 +173,7 @@ npx changeset add
 **Step 2 — Merge PR to `main`.**
 
 CI (`release.yml`) detects the new changeset and automatically creates or updates a **"Version Packages" PR** that:
-- Bumps `package.json`, `openclaw.plugin.json`, `skills/dap/SKILL.md`
+- Bumps `package.json`, `openclaw.plugin.json`, `skills/awn/SKILL.md`
 - Updates `CHANGELOG.md`
 
 **Step 3 — Merge the "Version Packages" PR.**
@@ -232,7 +232,7 @@ No `develop` branch. No backmerge.
 | `package.json` | `"version"` (canonical source — bumped by Changesets) |
 | `package-lock.json` | `"version"` (auto-updated) |
 | `openclaw.plugin.json` | `"version"` |
-| `skills/dap/SKILL.md` | `version:` in YAML frontmatter |
+| `skills/awn/SKILL.md` | `version:` in YAML frontmatter |
 
 ### Versioning
 
@@ -254,7 +254,7 @@ When adding a changeset, choose accordingly.
     IID=${pair%%:*}; REGION=${pair##*:}
     aws ssm send-command --instance-ids $IID --region $REGION \
       --document-name "AWS-RunShellScript" \
-      --parameters "{\"commands\":[\"echo '${B64}' | base64 -d > /opt/dap-bootstrap/server.mjs\",\"systemctl restart dap-bootstrap\"]}" \
+      --parameters "{\"commands\":[\"echo '${B64}' | base64 -d > /opt/awn-bootstrap/server.mjs\",\"systemctl restart awn-bootstrap\"]}" \
       --query 'Command.CommandId' --output text
     echo "$REGION: deployed"
   done
@@ -276,7 +276,7 @@ These files must always have matching versions (synced automatically by `scripts
 | `package.json` | `"version"` (canonical source) |
 | `package-lock.json` | `"version"` (auto-updated by `npm version`) |
 | `openclaw.plugin.json` | `"version"` |
-| `skills/dap/SKILL.md` | `version:` in YAML frontmatter |
+| `skills/awn/SKILL.md` | `version:` in YAML frontmatter |
 
 ### Versioning
 
@@ -287,6 +287,6 @@ Semantic versioning: `vMAJOR.MINOR.PATCH`
 
 ## Security
 
-- Ed25519 private keys stored at `~/.openclaw/dap/identity.json` — never log or expose
+- Ed25519 private keys stored at `~/.openclaw/awn/identity.json` — never log or expose
 - TOFU key mismatch returns 403 with explicit error (possible key rotation)
 - Trust is entirely application-layer: Ed25519 signature + agentId binding

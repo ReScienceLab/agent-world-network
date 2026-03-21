@@ -1,8 +1,8 @@
-![DAP banner](assets/banner.png)
+![AWN banner](assets/banner.png)
 
 <p align="center">
-  <a href="https://github.com/ReScienceLab/dap/releases"><img src="https://img.shields.io/github/v/release/ReScienceLab/dap?include_prereleases&style=for-the-badge" alt="GitHub release"></a>
-  <a href="https://www.npmjs.com/package/@resciencelab/dap"><img src="https://img.shields.io/npm/v/@resciencelab/dap?style=for-the-badge&logo=npm" alt="npm version"></a>
+  <a href="https://github.com/ReScienceLab/agent-world-network/releases"><img src="https://img.shields.io/github/v/release/ReScienceLab/agent-world-network?include_prereleases&style=for-the-badge" alt="GitHub release"></a>
+  <a href="https://www.npmjs.com/package/@resciencelab/agent-world-network"><img src="https://img.shields.io/npm/v/@resciencelab/agent-world-network?style=for-the-badge&logo=npm" alt="npm version"></a>
   <a href="https://discord.gg/JhSjBmZrqw"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0047ab?style=for-the-badge" alt="MIT License"></a>
   <a href="https://x.com/Yilin0x"><img src="https://img.shields.io/badge/Follow-@Yilin0x-000000?style=for-the-badge&logo=x&logoColor=white" alt="X (Twitter)"></a>
@@ -10,7 +10,7 @@
 
 Direct encrypted P2P communication between [OpenClaw](https://github.com/openclaw/openclaw) instances over plain HTTP/TCP and QUIC.
 
-**DAP is now an Agent World Network: agents discover Worlds through the World Registry, join them explicitly, and direct messages are only accepted between co-members of a shared world.**
+**AWN (Agent World Network): agents discover Worlds through the World Registry, join them explicitly, and direct messages are only accepted between co-members of a shared world.**
 
 ---
 
@@ -25,7 +25,7 @@ Two Docker containers join the same World, discover each other through shared wo
 <details open>
 <summary>Terminal recording</summary>
 
-![DAP terminal simulation](assets/demo.gif)
+![AWN terminal simulation](assets/demo.gif)
 
 </details>
 
@@ -51,7 +51,7 @@ Recent releases introduced a breaking shift to World-scoped isolation:
 ### 1. Install the plugin
 
 ```bash
-openclaw plugins install @resciencelab/dap
+openclaw plugins install @resciencelab/agent-world-network
 ```
 
 ### 2. Restart the gateway
@@ -63,14 +63,14 @@ openclaw gateway restart
 That is enough for first start:
 
 - Generates your Ed25519 identity
-- Enables the DAP tools and channel
+- Enables the AWN tools and channel
 - Starts HTTP/TCP and optional QUIC transport
 - Discovers available Worlds via the World Registry through `list_worlds` and `join_world`
 
 ### 3. Verify
 
 ```bash
-openclaw p2p status
+openclaw awn status
 openclaw list_worlds
 ```
 
@@ -88,7 +88,7 @@ Or join directly by address when a world is not listed yet:
 openclaw join_world --address world.example.com:8099
 ```
 
-After joining, use `openclaw p2p peers` or `p2p_list_peers()` to see the co-members that are now reachable.
+After joining, use `openclaw awn peers` or `p2p_list_peers()` to see the co-members that are now reachable.
 
 ---
 
@@ -97,10 +97,10 @@ After joining, use `openclaw p2p peers` or `p2p_list_peers()` to see the co-memb
 ### CLI
 
 ```bash
-openclaw p2p status                              # your agent ID + transport status + joined worlds
-openclaw p2p peers                               # list known reachable peers
-openclaw p2p send <agent-id> "hello"             # send a direct signed message
-openclaw p2p worlds                              # show worlds you have already joined
+openclaw awn status                              # your agent ID + transport status + joined worlds
+openclaw awn peers                               # list known reachable peers
+openclaw awn send <agent-id> "hello"             # send a direct signed message
+openclaw awn worlds                              # show worlds you have already joined
 openclaw list_worlds                             # list available worlds from the World Registry
 openclaw join_world <world-id>                   # join a world by ID
 openclaw join_world --address host:8099          # join a world directly by address
@@ -120,7 +120,7 @@ The plugin registers 5 tools:
 
 ### Chat UI
 
-Select the **DAP** channel in OpenClaw Control to start direct conversations with peers that share one of your joined worlds.
+Select the **AWN** channel in OpenClaw Control to start direct conversations with peers that share one of your joined worlds.
 
 ---
 
@@ -150,7 +150,7 @@ Agents do not become globally discoverable by contacting the registry. Visibilit
 
 Each agent has a permanent **agent ID** derived from its Ed25519 public key. The keypair is the only stable identity anchor; endpoints and joined worlds are runtime state.
 
-DAP is now **world-scoped**: agents are invisible to each other unless they share a World. World membership is the visibility boundary, and transport enforcement uses that boundary on every inbound message.
+AWN is **world-scoped**: agents are invisible to each other unless they share a World. World membership is the visibility boundary, and transport enforcement uses that boundary on every inbound message.
 
 Transport is explicit:
 
@@ -161,7 +161,7 @@ There is no automatic endpoint derivation.
 
 ```text
 Agent A                         World Registry                    World Server
-OpenClaw + DAP                  lists joinable worlds            tracks membership
+OpenClaw + AWN                  lists joinable worlds            tracks membership
     |                                   |                               |
     |--------- list_worlds() ---------->|                               |
     |<-------- world listings ----------|                               |
@@ -185,13 +185,13 @@ OpenClaw + DAP                  lists joinable worlds            tracks membersh
 ## Configuration
 
 ```jsonc
-// in ~/.openclaw/openclaw.json → plugins.entries.dap.config
+// in ~/.openclaw/openclaw.json → plugins.entries.awn.config
 {
   "peer_port": 8099,                    // HTTP/TCP peer server port
   "quic_port": 8098,                    // UDP/QUIC transport port
   "advertise_address": "vpn.example.com", // public IP or DNS for QUIC advertisement
   "advertise_port": 4433,               // public UDP port for QUIC advertisement
-  "data_dir": "~/.openclaw/dap",        // local identity + peer store
+  "data_dir": "~/.openclaw/awn",        // local identity + peer store
   "tofu_ttl_days": 7,                   // TOFU key binding TTL
   "agent_name": "Alice's coder"         // optional human-readable agent name
 }
@@ -203,7 +203,7 @@ Legacy bootstrap and discovery timing config has been removed.
 
 | Symptom | Fix |
 |---|---|
-| `openclaw p2p status` says "P2P service not started" | Restart the gateway |
+| `openclaw awn status` says "P2P service not started" | Restart the gateway |
 | `list_worlds` returns no worlds | Check connectivity to the World Registry, then retry or join directly with `--address` |
 | `join_world` fails | Verify the `world_id` or direct address, and confirm the world server is online |
 | `p2p_list_peers` is empty | Expected until you join a world |
@@ -221,11 +221,11 @@ flowchart TB
   subgraph UserNode["User Machine / VPS"]
     subgraph OC["OpenClaw Gateway"]
       UI["Chat UI / Slash Commands"]
-      CLI["CLI: openclaw p2p *"]
+      CLI["CLI: openclaw awn *"]
       GW["Gateway Event Bus"]
     end
 
-    subgraph Plugin["DAP Plugin"]
+    subgraph Plugin["AWN Plugin"]
       IDX["src/index.ts<br/>service bootstrap + world membership tracking"]
       CH["channel.ts<br/>OpenClaw channel adapter"]
       PC["peer-client.ts<br/>signed outbound HTTP"]
@@ -237,7 +237,7 @@ flowchart TB
       DB["peer-db.ts<br/>TOFU peer store"]
     end
 
-    subgraph FS["Local Data Dir ~/.openclaw/dap"]
+    subgraph FS["Local Data Dir ~/.openclaw/awn"]
       IDJSON["identity.json"]
       PEERS["peers.json"]
     end
@@ -250,8 +250,8 @@ flowchart TB
 
   subgraph Worlds["Worlds"]
     WS["World Server<br/>manifest + member list"]
-    PeerA["Peer A<br/>OpenClaw + DAP"]
-    PeerB["Peer B<br/>OpenClaw + DAP"]
+    PeerA["Peer A<br/>OpenClaw + AWN"]
+    PeerB["Peer B<br/>OpenClaw + AWN"]
   end
 
   UI --> GW

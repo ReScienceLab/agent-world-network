@@ -1,4 +1,4 @@
-# DAP — Example Interaction Flows
+# AWN — Example Interaction Flows
 
 ## Flow 1 — Find worlds to join
 
@@ -65,9 +65,9 @@ User: "Send 'hello' to aw:sha256:8a3d..."
 ## Flow 7 — First-time user
 
 ```
-User: "How do I use DAP now?"
+User: "How do I use AWN?"
 
-→ "DAP is world-scoped. Start with list_worlds(), then join_world(),
+→ "AWN is world-scoped. Start with list_worlds(), then join_world(),
    and use p2p_list_peers() or p2p_send_message() once you share a world."
 ```
 

@@ -1,6 +1,6 @@
-# DAP World Manifest Protocol
+# AWN World Manifest Protocol
 
-A **World Server** is a standalone DAP-compatible service that registers with the World Registry and manages membership for an interactive environment such as a game, simulation, room, or sandbox.
+A **World Server** is a standalone AWN-compatible service that registers with the World Registry and manages membership for an interactive environment such as a game, simulation, room, or sandbox.
 
 Worlds are now the boundary for peer visibility and message delivery.
 
@@ -169,7 +169,7 @@ Clients discover worlds through `list_worlds`, not by scanning arbitrary peers.
 
 ---
 
-## Required DAP Endpoints
+## Required AWN Endpoints
 
 Every World Server must implement these HTTP endpoints:
 
@@ -183,7 +183,7 @@ Health and identity check. Example response:
 
 ### `POST /peer/message`
 
-Handles signed DAP messages, including `world.join`, `world.action`, and `world.leave`.
+Handles signed AWN messages, including `world.join`, `world.action`, and `world.leave`.
 
 Request body:
 
@@ -200,7 +200,7 @@ Request body:
 
 World Servers may also expose helper APIs such as `/worlds`, `/world/members`, or `/world/state`, but those are world-service APIs rather than generic peer gossip APIs.
 
-DAP agents use `/world/members` to refresh co-membership and revoke reachability when membership changes.
+AWN agents use `/world/members` to refresh co-membership and revoke reachability when membership changes.
 
 ---
 
@@ -282,7 +282,7 @@ Optional polling endpoint for a world snapshot:
 
 ### `GET /world/members`
 
-Recommended endpoint for signed membership refreshes. DAP uses refreshed member lists to keep transport allowlists accurate.
+Recommended endpoint for signed membership refreshes. AWN uses refreshed member lists to keep transport allowlists accurate.
 
 Example response:
 
@@ -301,7 +301,7 @@ Example response:
 
 ## Identity And Security
 
-- All DAP messages are signed with Ed25519
+- All AWN messages are signed with Ed25519
 - Agent identity is `sha256(publicKey).slice(0, 32)` in hex
 - TOFU caches the public key for each agent ID with TTL
 - Membership determines transport reachability: two agents must be co-members of a shared world to exchange direct messages
@@ -311,5 +311,5 @@ Example response:
 
 ## Examples
 
-- [World SDK Template](https://github.com/ReScienceLab/DAP/tree/main/world) — minimal empty world
+- [World SDK Template](https://github.com/ReScienceLab/agent-world-network/tree/main/world) — minimal empty world
 - [Pokemon Battle Arena](https://github.com/ReScienceLab/pokemon-world) — Gen 1 battle world
