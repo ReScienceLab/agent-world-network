@@ -71,6 +71,8 @@ console.log(`[gateway] agentId=${selfAgentId}`)
 // ---------------------------------------------------------------------------
 const registry = new Map() // agentId -> PeerRecord
 let _saveTimer = null
+let _pruneTimer = null
+let _shutdownPromise = null
 
 function writeRegistry() {
   fs.mkdirSync(DATA_DIR, { recursive: true })
@@ -349,6 +351,7 @@ async function startPeerListener() {
 
   await peerServer.listen({ port: PEER_PORT, host: "::" });
   console.log(`[gateway] AWN peer listener on [::]:${PEER_PORT}`);
+  return peerServer
 }
 
 // ---------------------------------------------------------------------------
@@ -486,10 +489,45 @@ app.get("/ws", { websocket: true }, (socket, req) => {
 // Startup
 // ---------------------------------------------------------------------------
 
+async function shutdown(signal, peerServer) {
+  if (_shutdownPromise) return _shutdownPromise
+
+  _shutdownPromise = (async () => {
+    console.log(`[gateway] Shutting down on ${signal}...`)
+
+    if (_pruneTimer) {
+      clearInterval(_pruneTimer)
+      _pruneTimer = null
+    }
+
+    flushRegistry()
+
+    try {
+      await app.close()
+    } catch (error) {
+      console.warn("[gateway] Failed to close public server cleanly", error)
+    }
+
+    try {
+      await peerServer.close()
+    } catch (error) {
+      console.warn("[gateway] Failed to close peer server cleanly", error)
+    }
+  })()
+
+  return _shutdownPromise
+}
+
 loadRegistry()
-await startPeerListener()
+const peerServer = await startPeerListener()
 await app.listen({ port: HTTP_PORT, host: "::" })
 console.log(`[gateway] Public HTTP on [::]:${HTTP_PORT}`)
 
 // Prune stale agents every 3 minutes
-setInterval(() => pruneStaleAgents(), 3 * 60 * 1000)
+_pruneTimer = setInterval(() => pruneStaleAgents(), 3 * 60 * 1000)
+
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  process.once(signal, () => {
+    void shutdown(signal, peerServer)
+  })
+}
