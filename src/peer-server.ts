@@ -129,7 +129,12 @@ export async function startPeerServer(port: number = 8099, opts?: PeerServerOpti
     return payload
   })
 
-  server.get("/peer/ping", async () => ({ ok: true, ts: Date.now() }))
+  server.get("/peer/ping", async () => ({
+    ok: true,
+    ts: Date.now(),
+    agentId: _selfMeta.agentId ?? _identity?.agentId,
+    publicKey: _selfMeta.publicKey ?? _identity?.publicKey,
+  }))
 
   server.post("/peer/message", async (req, reply) => {
     const raw = req.body as any

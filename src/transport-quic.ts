@@ -54,6 +54,11 @@ export class UDPTransport implements Transport {
     const advertisePort = (opts?.advertisePort as number | undefined)
       ?? (process.env.ADVERTISE_PORT ? parseInt(process.env.ADVERTISE_PORT, 10) : undefined)
 
+    if (!testMode && !advertiseAddress) {
+      console.warn("[transport:quic] Disabled: no advertised public endpoint configured (set ADVERTISE_ADDRESS / advertise_address)")
+      return false
+    }
+
     // Check for native QUIC support first
     this._useNativeQuic = isNativeQuicAvailable()
     if (this._useNativeQuic) {
@@ -92,7 +97,7 @@ export class UDPTransport implements Transport {
         console.log(`[transport:quic] Advertised endpoint: ${this._address}`)
       }
 
-      // Fallback to local loopback (no auto-detection)
+      // Tests can run without a public endpoint; production cannot.
       if (!this._address) {
         this._address = `[::1]:${actualPort}`
         if (!testMode) {
@@ -143,8 +148,8 @@ export class UDPTransport implements Transport {
   getEndpoint(): TransportEndpoint {
     return {
       transport: "quic",
-      address: this._address,
-      port: this._port,
+      address: this._publicEndpoint?.address ?? this._address,
+      port: this._publicEndpoint?.port ?? this._port,
       priority: 0,
       ttl: 3600,
     }

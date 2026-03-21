@@ -71,7 +71,7 @@ let _transportManager: TransportManager | null = null
 let _quicTransport: UDPTransport | null = null
 
 // Track joined worlds for periodic member refresh
-const _joinedWorlds = new Map<string, { agentId: string; address: string; port: number }>()
+const _joinedWorlds = new Map<string, { agentId: string; address: string; port: number; publicKey: string }>()
 const _worldMembersByWorld = new Map<string, Set<string>>()
 const _worldScopedPeerWorlds = new Map<string, Set<string>>()
 const _worldRefreshFailures = new Map<string, number>()
@@ -193,24 +193,24 @@ async function refreshWorldMembers(): Promise<void> {
         continue
       }
       const bodyText = await resp.text()
-
-      // Verify response signature if the world server's publicKey is known (TOFU cache)
-      const worldPeer = getPeer(info.agentId)
-      if (worldPeer?.publicKey) {
-        const respHeaders: Record<string, string | null> = {}
-        resp.headers.forEach((v, k) => { respHeaders[k] = v })
-        const sigResult = verifyHttpResponseHeaders(respHeaders, resp.status, bodyText, worldPeer.publicKey)
-        if (!sigResult.ok) {
-          console.warn(`[p2p] /world/members response signature invalid for ${worldId}: ${sigResult.error}`)
-          recordWorldRefreshFailure(worldId)
-          continue
-        }
+      const verification = verifyHttpResponseHeaders(
+        Object.fromEntries(Array.from(resp.headers.entries()).map(([key, value]) => [key, value])),
+        resp.status,
+        bodyText,
+        info.publicKey
+      )
+      if (!verification.ok) {
+        recordWorldRefreshFailure(worldId)
+        continue
       }
 
       const body = JSON.parse(bodyText) as { members?: Array<{ agentId: string; alias?: string; endpoints?: Endpoint[] }> }
       const memberList = body.members ?? []
       syncWorldMembers(worldId, memberList)
-      setWorldMembers(worldId, memberList.map(m => m.agentId).filter(id => id !== identity!.agentId))
+      setWorldMembers(
+        worldId,
+        [info.agentId, ...memberList.map(m => m.agentId).filter(id => id !== identity!.agentId)]
+      )
       _worldRefreshFailures.delete(worldId)
     } catch {
       recordWorldRefreshFailure(worldId)
@@ -693,6 +693,7 @@ export default function register(api: any) {
       let targetAddr: string
       let targetPort: number = peerPort
       let worldAgentId: string | undefined
+      let worldPublicKey: string | undefined
 
       if (params.address) {
         const parsedAddress = parseDirectPeerAddress(params.address, peerPort)
@@ -706,7 +707,11 @@ export default function register(api: any) {
         if (typeof ping.data?.agentId !== "string" || ping.data.agentId.length === 0) {
           return { content: [{ type: "text", text: `World at ${params.address} did not provide a stable agent ID.` }], isError: true }
         }
+        if (typeof ping.data?.publicKey !== "string" || ping.data.publicKey.length === 0) {
+          return { content: [{ type: "text", text: `World at ${params.address} did not provide a verifiable public key.` }], isError: true }
+        }
         worldAgentId = ping.data.agentId
+        worldPublicKey = ping.data.publicKey
       } else {
         const worlds = findPeersByCapability(`world:${params.world_id}`)
         if (!worlds.length) {
@@ -719,6 +724,11 @@ export default function register(api: any) {
         targetAddr = world.endpoints[0].address
         targetPort = world.endpoints[0].port ?? peerPort
         worldAgentId = world.agentId
+        worldPublicKey = getPeer(worldAgentId)?.publicKey ?? ""
+      }
+
+      if (!worldPublicKey) {
+        return { content: [{ type: "text", text: "World public key is unavailable; cannot verify signed membership refreshes." }], isError: true }
       }
 
       const myEndpoints: Endpoint[] = _agentMeta.endpoints ?? []
@@ -739,7 +749,7 @@ export default function register(api: any) {
         ? (result.data.manifest as { name: string }).name
         : worldId
 
-      upsertDiscoveredPeer(worldAgentId!, "", {
+      upsertDiscoveredPeer(worldAgentId!, worldPublicKey, {
         alias: worldName,
         capabilities: [`world:${worldId}`],
         endpoints: [{ transport: "tcp", address: targetAddr, port: targetPort, priority: 1, ttl: 3600 }],
@@ -751,7 +761,7 @@ export default function register(api: any) {
       addWorldMembers(worldId, [worldAgentId!, ...joinMembers.map(m => m.agentId).filter(id => id !== identity!.agentId)])
 
       // Track this world for periodic member refresh
-      _joinedWorlds.set(worldId, { agentId: worldAgentId!, address: targetAddr, port: targetPort })
+      _joinedWorlds.set(worldId, { agentId: worldAgentId!, address: targetAddr, port: targetPort, publicKey: worldPublicKey })
       _worldRefreshFailures.delete(worldId)
       if (!_memberRefreshTimer) {
         _memberRefreshTimer = setInterval(refreshWorldMembers, MEMBER_REFRESH_INTERVAL_MS)

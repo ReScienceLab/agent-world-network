@@ -98,16 +98,22 @@ export class TransportManager {
   }
 
   getEndpoints(): Endpoint[] {
-    return Array.from(this._transports.values()).map((t) => {
-      const ep = t.getEndpoint()
-      return {
-        transport: ep.transport as Endpoint["transport"],
-        address: ep.address,
-        port: ep.port,
-        priority: ep.priority,
-        ttl: ep.ttl,
+    const endpoints: Endpoint[] = []
+    for (const t of this._transports.values()) {
+      try {
+        const ep = t.getEndpoint()
+        endpoints.push({
+          transport: ep.transport as Endpoint["transport"],
+          address: ep.address,
+          port: ep.port,
+          priority: ep.priority,
+          ttl: ep.ttl,
+        })
+      } catch {
+        continue
       }
-    })
+    }
+    return endpoints
   }
 
   resolveTransport(address: string): Transport | null {
