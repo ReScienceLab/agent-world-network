@@ -7,9 +7,9 @@
 import * as os from "os"
 import * as path from "path"
 import { execSync } from "child_process"
-import { loadOrCreateIdentity, deriveDidKey } from "./identity"
+import { loadOrCreateIdentity, deriveDidKey, verifyHttpResponseHeaders } from "./identity"
 import { initDb, listPeers, getPeer, flushDb, getPeerIds, getEndpointAddress, setTofuTtl, findPeersByCapability, removePeer } from "./peer-db"
-import { startPeerServer, stopPeerServer, setSelfMeta, handleUdpMessage, addWorldMembers, removeWorld, clearWorldMembers } from "./peer-server"
+import { startPeerServer, stopPeerServer, setSelfMeta, handleUdpMessage, addWorldMembers, setWorldMembers, removeWorld, clearWorldMembers } from "./peer-server"
 import { sendP2PMessage, pingPeer, broadcastLeave, SendOptions, getPeerPingInfo } from "./peer-client"
 import { upsertDiscoveredPeer } from "./peer-db"
 import { buildChannel, wireInboundToGateway, CHANNEL_CONFIG_SCHEMA } from "./channel"
@@ -192,10 +192,25 @@ async function refreshWorldMembers(): Promise<void> {
         recordWorldRefreshFailure(worldId)
         continue
       }
-      const body = await resp.json() as { members?: Array<{ agentId: string; alias?: string; endpoints?: Endpoint[] }> }
+      const bodyText = await resp.text()
+
+      // Verify response signature if the world server's publicKey is known (TOFU cache)
+      const worldPeer = getPeer(info.agentId)
+      if (worldPeer?.publicKey) {
+        const respHeaders: Record<string, string | null> = {}
+        resp.headers.forEach((v, k) => { respHeaders[k] = v })
+        const sigResult = verifyHttpResponseHeaders(respHeaders, resp.status, bodyText, worldPeer.publicKey)
+        if (!sigResult.ok) {
+          console.warn(`[p2p] /world/members response signature invalid for ${worldId}: ${sigResult.error}`)
+          recordWorldRefreshFailure(worldId)
+          continue
+        }
+      }
+
+      const body = JSON.parse(bodyText) as { members?: Array<{ agentId: string; alias?: string; endpoints?: Endpoint[] }> }
       const memberList = body.members ?? []
       syncWorldMembers(worldId, memberList)
-      addWorldMembers(worldId, memberList.map(m => m.agentId).filter(id => id !== identity!.agentId))
+      setWorldMembers(worldId, memberList.map(m => m.agentId).filter(id => id !== identity!.agentId))
       _worldRefreshFailures.delete(worldId)
     } catch {
       recordWorldRefreshFailure(worldId)
@@ -259,7 +274,12 @@ export default function register(api: any) {
       _transportManager.register(_quicTransport)
 
       const quicPort = cfg.quic_port ?? 8098
-      const activeTransport = await _transportManager.start(identity, { dataDir, quicPort })
+      const activeTransport = await _transportManager.start(identity, {
+        dataDir,
+        quicPort,
+        advertiseAddress: cfg.advertise_address,
+        advertisePort: cfg.advertise_port,
+      })
 
       if (activeTransport) {
         console.log(`[p2p] Active transport: ${activeTransport.id} -> ${activeTransport.address}`)

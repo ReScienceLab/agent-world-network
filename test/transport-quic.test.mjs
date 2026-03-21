@@ -1,6 +1,6 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import { parseHostPort, isNativeQuicAvailable, parseStunResponse } from "../dist/transport-quic.js"
+import { parseHostPort, isNativeQuicAvailable } from "../dist/transport-quic.js"
 import { UDPTransport } from "../dist/transport-quic.js"
 
 describe("parseHostPort", () => {
@@ -40,42 +40,6 @@ describe("isNativeQuicAvailable", () => {
   })
 })
 
-describe("parseStunResponse", () => {
-  it("returns null for too-short buffer", () => {
-    const buf = Buffer.alloc(10)
-    assert.equal(parseStunResponse(buf), null)
-  })
-
-  it("returns null for non-binding-success response", () => {
-    const buf = Buffer.alloc(20)
-    buf.writeUInt16BE(0x0100, 0) // Not a Binding Success Response
-    assert.equal(parseStunResponse(buf), null)
-  })
-
-  it("parses MAPPED-ADDRESS attribute", () => {
-    // Build a minimal STUN Binding Success Response with MAPPED-ADDRESS
-    const buf = Buffer.alloc(32)
-    buf.writeUInt16BE(0x0101, 0)  // Binding Success Response
-    buf.writeUInt16BE(12, 2)      // Message Length
-    // Skip magic cookie + transaction ID (bytes 4-19)
-    // MAPPED-ADDRESS attribute at offset 20
-    buf.writeUInt16BE(0x0001, 20) // Attribute type: MAPPED-ADDRESS
-    buf.writeUInt16BE(8, 22)      // Attribute length
-    buf[24] = 0x00                // Padding
-    buf[25] = 0x01                // Family: IPv4
-    buf.writeUInt16BE(12345, 26)  // Port
-    buf[28] = 203                 // IP: 203.0.113.1
-    buf[29] = 0
-    buf[30] = 113
-    buf[31] = 1
-
-    const result = parseStunResponse(buf)
-    assert.ok(result)
-    assert.equal(result.address, "203.0.113.1")
-    assert.equal(result.port, 12345)
-  })
-})
-
 describe("UDPTransport", () => {
   it("has id 'quic'", () => {
     const qt = new UDPTransport()
@@ -97,13 +61,40 @@ describe("UDPTransport", () => {
 
   it("can start and stop in test mode", async () => {
     const qt = new UDPTransport()
-    const id = { agentId: "test", publicKey: "", privateKey: "", cgaIpv6: "", yggIpv6: "" }
+    const id = { agentId: "test", publicKey: "", privateKey: "" }
     const ok = await qt.start(id, { testMode: true, quicPort: 0 })
     assert.equal(ok, true)
     assert.equal(qt.isActive(), true)
     assert.ok(qt.address.length > 0)
     await qt.stop()
     assert.equal(qt.isActive(), false)
+  })
+
+  it("uses ADVERTISE_ADDRESS when provided", async () => {
+    const qt = new UDPTransport()
+    const id = { agentId: "test", publicKey: "", privateKey: "" }
+    const ok = await qt.start(id, {
+      quicPort: 0,
+      advertiseAddress: "203.0.113.1",
+      advertisePort: 9000,
+    })
+    assert.equal(ok, true)
+    assert.equal(qt.address, "203.0.113.1:9000")
+    assert.deepEqual(qt.publicEndpoint, { address: "203.0.113.1", port: 9000 })
+    await qt.stop()
+  })
+
+  it("uses bracketed format for IPv6 advertise address", async () => {
+    const qt = new UDPTransport()
+    const id = { agentId: "test", publicKey: "", privateKey: "" }
+    const ok = await qt.start(id, {
+      quicPort: 0,
+      advertiseAddress: "2001:db8::1",
+      advertisePort: 8098,
+    })
+    assert.equal(ok, true)
+    assert.equal(qt.address, "[2001:db8::1]:8098")
+    await qt.stop()
   })
 
   it("registers message handlers", () => {

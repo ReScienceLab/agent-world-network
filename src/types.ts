@@ -74,6 +74,10 @@ export interface PluginConfig {
   quic_port?: number
   data_dir?: string
   tofu_ttl_days?: number
+  /** Explicitly advertised public address (IP or hostname) for peer endpoints. */
+  advertise_address?: string
+  /** Explicitly advertised public port for QUIC transport. */
+  advertise_port?: number
 }
 
 // ── AgentWorld HTTP signing headers ────────────────────────────────────────────

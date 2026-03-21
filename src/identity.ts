@@ -9,7 +9,6 @@ import { sha256 } from "@noble/hashes/sha256"
 import { createHash } from "node:crypto"
 import * as fs from "fs"
 import * as path from "path"
-import * as os from "os"
 import { Identity, AwRequestHeaders, AwResponseHeaders } from "./types"
 
 // Protocol version for HTTP signatures and domain separators.
@@ -334,49 +333,3 @@ export function verifyHttpResponseHeaders(
   return ok ? { ok: true } : { ok: false, error: "Invalid X-AgentWorld-Signature" }
 }
 
-// ── Utility ─────────────────────────────────────────────────────────────────
-
-/**
- * Returns true if addr is a globally-routable unicast IPv6 address (2000::/3).
- */
-export function isGlobalUnicastIPv6(addr: string): boolean {
-  if (!addr || !addr.includes(":")) return false
-  const clean = addr.replace(/^::ffff:/i, "").toLowerCase()
-  if (clean === "::1") return false
-  if (clean.startsWith("fe80:")) return false
-  if (clean.startsWith("fc") || clean.startsWith("fd")) return false
-  const first = parseInt(clean.split(":")[0].padStart(4, "0"), 16)
-  return first >= 0x2000 && first <= 0x3fff
-}
-
-/**
- * Returns the first globally-routable public IPv6 address on any interface.
- */
-export function getPublicIPv6(): string | null {
-  const ifaces = os.networkInterfaces()
-  for (const iface of Object.values(ifaces)) {
-    if (!iface) continue
-    for (const info of iface) {
-      if (info.family === "IPv6" && !info.internal && isGlobalUnicastIPv6(info.address)) {
-        return info.address
-      }
-    }
-  }
-  return null
-}
-
-/**
- * Returns the first non-loopback, non-link-local IPv6 address on any interface.
- */
-export function getActualIpv6(): string | null {
-  const ifaces = os.networkInterfaces()
-  for (const iface of Object.values(ifaces)) {
-    if (!iface) continue
-    for (const info of iface) {
-      if (info.family === "IPv6" && !info.internal && !info.address.startsWith("fe80:")) {
-        return info.address
-      }
-    }
-  }
-  return null
-}

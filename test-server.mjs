@@ -2,7 +2,7 @@
  * Local test: run a standalone P2P peer server (Node B).
  * Usage: NODE_ROLE=server P2P_PORT=8099 node test-server.mjs
  */
-import { loadOrCreateIdentity, getActualIpv6 } from "./dist/identity.js";
+import { loadOrCreateIdentity } from "./dist/identity.js";
 import { initDb } from "./dist/peer-db.js";
 import { startPeerServer, getInbox } from "./dist/peer-server.js";
 import { mkdirSync } from "fs";
@@ -16,11 +16,7 @@ mkdirSync(DATA_DIR, { recursive: true });
 const identity = loadOrCreateIdentity(DATA_DIR);
 initDb(DATA_DIR);
 
-const actualIpv6 = getActualIpv6();
-if (actualIpv6) identity.yggIpv6 = actualIpv6;
-
 console.log(`[node-b] Agent ID : ${identity.agentId.slice(0, 8)}...`);
-console.log(`[node-b] IPv6     : ${identity.yggIpv6}`);
 console.log(`[node-b] Starting peer server on [::]:${PORT} (test mode)...`);
 
 await startPeerServer(PORT, { testMode: true });

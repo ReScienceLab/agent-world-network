@@ -38,6 +38,11 @@ export function addWorldMembers(worldId: string, memberIds: string[]): void {
   for (const id of memberIds) set.add(id)
 }
 
+/** Replace the member set for a world — revokes access for any IDs not in the new list. */
+export function setWorldMembers(worldId: string, memberIds: string[]): void {
+  _worldMembers.set(worldId, new Set(memberIds))
+}
+
 export function removeWorld(worldId: string): void {
   _worldMembers.delete(worldId)
 }
