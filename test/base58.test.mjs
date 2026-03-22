@@ -1,6 +1,6 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import { base58Encode, deriveDidKey } from "../packages/agent-world-sdk/dist/identity.js"
+import { base58Encode, deriveDidKey, toPublicKeyMultibase } from "../packages/agent-world-sdk/dist/identity.js"
 import { base58Decode } from "../packages/agent-world-sdk/dist/peer-protocol.js"
 
 const encodeCases = [
@@ -21,6 +21,7 @@ const decodeCases = [
 
 const deterministicPublicKeyB64 = "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w="
 const deterministicDidKey = "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX"
+const deterministicPublicKeyMultibase = "z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX"
 
 describe("base58Encode", () => {
   for (const { bytes, encoded } of encodeCases) {
@@ -50,5 +51,11 @@ describe("base58 round trips", () => {
 describe("deriveDidKey", () => {
   it("returns the fixed DID for the deterministic fixture", () => {
     assert.equal(deriveDidKey(deterministicPublicKeyB64), deterministicDidKey)
+  })
+})
+
+describe("toPublicKeyMultibase", () => {
+  it("returns the fixed multibase value for the deterministic fixture", () => {
+    assert.equal(toPublicKeyMultibase(deterministicPublicKeyB64), deterministicPublicKeyMultibase)
   })
 })

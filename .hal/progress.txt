@@ -315,3 +315,12 @@
   - For this branch, the stable DID literal for `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=` is `did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX`, and keeping it inline avoids recomputing expectations in the test.
   - No `AGENTS.md` update was needed because the reusable deterministic-fixture guidance was already captured in the root guide and Codebase Patterns section.
 ---
+## 2026-03-22 14:55:19 UTC - T-008
+- Added deterministic `toPublicKeyMultibase` regression coverage to `test/base58.test.mjs` using the fixed public-key fixture and the explicit expected multibase literal.
+- Verified the story with `npm --prefix packages/agent-world-sdk run build`, `npm run build`, and `node --test test/*.test.mjs`; the full suite passed with 178 tests and 0 failures.
+- Files changed: `test/base58.test.mjs`, `.hal/auto-prd.json`, `.hal/progress.txt`
+- **Learnings for future iterations:**
+  - The `toPublicKeyMultibase()` regression belongs next to the direct Base58 and `deriveDidKey()` checks in `test/base58.test.mjs`, importing the compiled SDK helper from `packages/agent-world-sdk/dist/identity.js`.
+  - For this deterministic fixture, keep the expected multibase output inline as `z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX` so future codec changes cannot silently shift the canonical string.
+  - No `AGENTS.md` update was needed because the reusable fixture and compiled-artifact testing patterns were already documented in the root guide and Codebase Patterns section.
+---

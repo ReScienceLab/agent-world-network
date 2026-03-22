@@ -114,8 +114,8 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Extended `test/base58.test.mjs` with a deterministic `toPublicKeyMultibase()` assertion that uses the fixed public-key fixture `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=` and the explicit expected multibase literal `z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX`. Verified with `npm --prefix packages/agent-world-sdk run build`, `npm run build`, and `node --test test/*.test.mjs`."
     },
     {
       "id": "T-009",
