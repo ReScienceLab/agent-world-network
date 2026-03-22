@@ -72,3 +72,11 @@
   - Root `AGENTS.md` is the right place to preserve world-server conventions that apply across future stories in this branch.
   - Full test validation in this repo currently requires building both the root package and `packages/agent-world-sdk`; the root `npm run build` alone does not create the SDK `dist/` files consumed by several tests.
 ---
+## 2026-03-22 13:44:42 UTC - T-002
+- Added `getBroadcastRecipientIds()` in `packages/agent-world-sdk/src/world-server.ts` and switched `broadcastWorldState()` to derive eligible recipient agent IDs from active membership state instead of iterating `peerDb.values()`.
+- Files changed: `packages/agent-world-sdk/src/world-server.ts`, `.hal/auto-prd.json`, `.hal/progress.txt`
+- **Learnings for future iterations:**
+  - In `world-server.ts`, recipient selection and transport lookup are separate concerns: select member IDs from `agentLastSeen` plus `agentEndpoints`, then let later logic decide how to resolve per-recipient delivery metadata.
+  - This story only narrows who is eligible for broadcast; endpoint ownership and multi-endpoint delivery assertions still belong to the next stories.
+  - A focused SDK-only `npm --prefix packages/agent-world-sdk run build` is enough to typecheck changes isolated to the world server before broader regression coverage is added.
+---

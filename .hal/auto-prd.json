@@ -1,0 +1,133 @@
+{
+  "project": "Restrict World State Broadcasts",
+  "branchName": "compound/restrict-world-state-broadcasts",
+  "description": "Restrict world-state broadcast recipients to active world members derived from membership state, use each member's own endpoints for delivery, and add regression coverage for both exclusion and inclusion paths.",
+  "userStories": [
+    {
+      "id": "T-001",
+      "title": "Inspect current world-state broadcast targeting",
+      "description": "As a developer, I need the existing broadcastWorldState recipient-selection flow documented so that the privacy fix can replace the unsafe path without broad refactoring.",
+      "acceptanceCriteria": [
+        "The implementation notes identify the current recipient-selection logic in packages/agent-world-sdk/src/world-server.ts.",
+        "The notes confirm whether broadcastWorldState currently iterates over peerDb.values() for recipient targeting.",
+        "The notes identify agentLastSeen and agentEndpoints as the membership structures available for recipient derivation.",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Inspection completed in packages/agent-world-sdk/src/world-server.ts. broadcastWorldState() currently builds knownPeers from [...peerDb.values()].filter((p) => p.endpoints?.length) and then iterates those peer records for delivery. The world server already tracks active membership separately via agentLastSeen (Map<string, number>) and agentEndpoints (Map<string, { alias: string; endpoints: Endpoint[] }>), and getMembers() already treats membership as the intersection of those two structures."
+    },
+    {
+      "id": "T-002",
+      "title": "Add membership-based recipient selection",
+      "description": "As a developer, I need broadcast recipient IDs derived from active membership state so that only joined agents are eligible for world-state delivery.",
+      "acceptanceCriteria": [
+        "broadcastWorldState no longer uses peerDb.values() to determine recipient agent IDs.",
+        "Recipient selection is derived from agentLastSeen entries for the world.",
+        "Only agent IDs with at least one endpoint entry in agentEndpoints are returned as eligible recipients.",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Added getBroadcastRecipientIds() in packages/agent-world-sdk/src/world-server.ts so broadcastWorldState() now derives recipient agent IDs from agentLastSeen and only keeps IDs that still have at least one endpoint entry in agentEndpoints. The broadcast path no longer iterates peerDb.values() to choose recipients."
+    },
+    {
+      "id": "T-003",
+      "title": "Isolate eligible member endpoints for broadcast",
+      "description": "As a developer, I need a per-member endpoint lookup in the broadcast path so that each selected member is paired only with its own registered endpoints.",
+      "acceptanceCriteria": [
+        "The broadcast logic resolves endpoints from agentEndpoints for the currently selected member ID.",
+        "Members without endpoints are skipped without attempting delivery.",
+        "The code no longer reuses endpoint lists from unrelated peer records when preparing world-state sends.",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "T-004",
+      "title": "Route sends through the existing delivery path",
+      "description": "As a joined agent, I need world-state snapshots delivered through the existing send mechanism so that the privacy fix preserves successful delivery behavior for valid members.",
+      "acceptanceCriteria": [
+        "The inner broadcast loop still calls the existing world-state send path for each eligible endpoint.",
+        "A member with multiple registered endpoints triggers one send attempt per owned endpoint.",
+        "No new delivery mechanism bypasses the current broadcast send implementation.",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "T-005",
+      "title": "Add a non-member broadcast exclusion test fixture",
+      "description": "As a developer, I need a focused test setup that models a known peer without active world membership so that the privacy leak can be verified in isolation.",
+      "acceptanceCriteria": [
+        "A test fixture or setup in test/*.test.mjs represents a peer known to discovery but absent from the world's active membership state.",
+        "The fixture includes peer data that would have been reachable under the pre-fix peerDb-based selection path.",
+        "The test setup builds from dist output following the repository's test conventions.",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "T-006",
+      "title": "Verify non-members do not receive world-state broadcasts",
+      "description": "As a developer, I need regression coverage for denied delivery so that peers without active membership cannot silently receive world snapshots again.",
+      "acceptanceCriteria": [
+        "A test asserts that a known peer without an agentLastSeen membership entry does not receive a world-state broadcast.",
+        "The test verifies that no send attempt is made to endpoints owned only by the non-member peer.",
+        "The test fails against the pre-fix peerDb-based recipient selection and passes with the membership-based implementation.",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "T-007",
+      "title": "Verify active members still receive broadcasts on their own endpoints",
+      "description": "As a developer, I need regression coverage for allowed delivery so that active joined members continue receiving world-state updates after the privacy fix.",
+      "acceptanceCriteria": [
+        "A test asserts that an agent present in agentLastSeen with at least one endpoint in agentEndpoints receives a world-state broadcast.",
+        "The test verifies delivery uses the joined member's own endpoint data rather than another peer's endpoints.",
+        "The test covers a member with multiple endpoints or explicitly verifies iteration over all registered endpoints.",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "T-008",
+      "title": "Align existing broadcast coverage with membership-only behavior",
+      "description": "As a developer, I need existing broadcast tests reviewed and updated only where necessary so that the new membership requirement is enforced without weakening coverage.",
+      "acceptanceCriteria": [
+        "Existing world-state broadcast tests continue to run with assertions intact unless an assertion conflicts with the new membership-only rule.",
+        "Any updated expectation explicitly reflects that only active joined members are valid broadcast recipients.",
+        "No existing assertion is removed solely to make the new implementation pass.",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "T-009",
+      "title": "Run build and full test validation",
+      "description": "As a developer, I need project validation completed after the code and regression updates so that the change is ready for review and autonomous execution.",
+      "acceptanceCriteria": [
+        "npm run build succeeds after the recipient-selection and test changes.",
+        "node --test test/*.test.mjs succeeds after building.",
+        "The final diff includes the membership-based broadcast targeting change and regression coverage for both denied and allowed delivery paths.",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
