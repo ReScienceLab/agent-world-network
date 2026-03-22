@@ -86,8 +86,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Extended `test/base58.test.mjs` with exact decode assertions for `\"1\"`, `\"11\"`, `\"12\"`, `\"2\"`, and `\"5R\"`, plus byte-for-byte round-trip checks for `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]`. Exported `base58Decode` from `packages/agent-world-sdk/src/peer-protocol.ts` and the SDK index so the regression can import the compiled artifact at `packages/agent-world-sdk/dist/peer-protocol.js`. Verified with `npm --prefix packages/agent-world-sdk run build`, `npm run build`, and `node --test test/*.test.mjs`."
     },
     {
       "id": "T-007",

@@ -336,7 +336,7 @@ export function registerPeerRoutes(
 }
 
 /** Convert a multibase (z<base58btc>) Ed25519 public key to base64. */
-function multibaseToBase64(multibase: string): string {
+export function multibaseToBase64(multibase: string): string {
   if (!multibase.startsWith("z"))
     throw new Error("Unsupported multibase prefix");
   const bytes = base58Decode(multibase.slice(1));
@@ -346,7 +346,7 @@ function multibaseToBase64(multibase: string): string {
 
 const BASE58_ALPHABET =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-function base58Decode(str: string): Uint8Array {
+export function base58Decode(str: string): Uint8Array {
   if (str.length === 0) return new Uint8Array()
 
   const bytes = [0];

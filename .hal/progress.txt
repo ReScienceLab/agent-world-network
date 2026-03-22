@@ -3,6 +3,7 @@
 ## Codebase Patterns
 - For deterministic identity-helper regressions in this branch, use `nacl.sign.keyPair.fromSeed(Buffer.alloc(32, 1))`; its public key is `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=` and it maps to stable literals for both `deriveDidKey()` and `toPublicKeyMultibase()`.
 - For Base58 zero-boundary fixes in this repo, both codec halves need explicit all-zero handling: the encoder must not append the synthetic zero digit after leading `1`s, and the decoder must not retain the synthetic accumulator byte for all-leading-`1` inputs.
+- Direct Base58 boundary regressions in `test/base58.test.mjs` should import compiled helpers from the SDK `dist/` split points: `base58Encode` from `dist/identity.js` and `base58Decode` from `dist/peer-protocol.js`.
 - In `packages/agent-world-sdk/src/peer-protocol.ts`, `/peer/key-rotation` validation is authoritative inside `registerPeerRoutes()`, and new key-binding checks should run after multibase decoding but before `peerDb.upsert(...)`.
 - Reuse `agentIdFromPublicKey()` from `packages/agent-world-sdk/src/crypto.ts` for any public-key-to-agent binding check; do not duplicate the derivation logic in route handlers or tests.
 - Repo-level key-rotation tests exercise `dist/peer-server.js`, so whenever the SDK `registerPeerRoutes()` rotation contract changes, mirror the same validation and error payload in `src/peer-server.ts` before relying on `test/key-rotation.test.mjs`.
@@ -295,4 +296,13 @@
 - **Learnings for future iterations:**
   - When Hal bookkeeping and branch state drift, prefer a targeted verification pass before flipping `passes` so the PRD matches the code already on disk.
   - For the encode-only codec story, a focused SDK build plus the dedicated `test/base58.test.mjs` run is enough to confirm acceptance without rerunning unrelated suites.
+---
+## 2026-03-22 14:50:45 UTC - T-006
+- Exported `base58Decode` from the SDK peer-protocol surface and extended `test/base58.test.mjs` with direct decode assertions plus byte-for-byte round-trip coverage for the five leading-zero boundary cases.
+- Verified the story with `npm --prefix packages/agent-world-sdk run build`, `npm run build`, and `node --test test/*.test.mjs`; the full suite passed with 176 tests and 0 failures.
+- Files changed: `packages/agent-world-sdk/src/peer-protocol.ts`, `packages/agent-world-sdk/src/index.ts`, `test/base58.test.mjs`, `.hal/auto-prd.json`, `.hal/progress.txt`
+- **Learnings for future iterations:**
+  - Because the Base58 codec is split across SDK modules, direct decode coverage needs `base58Decode` exported from `peer-protocol.ts`; otherwise the root regression cannot import the compiled decoder without reaching into unexported internals.
+  - For these boundary tests, round-trip assertions should compare decoded bytes against the original arrays directly, not only check that re-encoding reproduces the same string.
+  - No `AGENTS.md` update was needed here because the reusable compiled-artifact import pattern is now captured in the Codebase Patterns section.
 ---
