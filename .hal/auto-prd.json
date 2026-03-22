@@ -141,8 +141,8 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added `test/base58.test.mjs` with exact encode assertions for `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]`, importing `base58Encode` from the built SDK artifact at `packages/agent-world-sdk/dist/identity.js`. Exported `base58Encode` from `packages/agent-world-sdk/src/identity.ts` and the SDK index so the regression can exercise the compiled implementation directly."
     }
   ]
 }

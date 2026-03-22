@@ -279,3 +279,12 @@
   - Repo validation for codec changes should still use `npm run build`, `npm --prefix packages/agent-world-sdk run build`, and `node --test test/*.test.mjs` because the root tests import built artifacts from both `dist/` trees.
   - Updating the root `AGENTS.md` was worthwhile here because the all-zero special-case rule is a reusable constraint for future Base58 maintenance in this codebase.
 ---
+## 2026-03-22 14:46:39 UTC - T-005
+- Exported `base58Encode` from the SDK identity module and package index, then added `test/base58.test.mjs` with direct encode regressions for `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]` against the compiled SDK artifact.
+- Verified the story with `npm --prefix packages/agent-world-sdk run build`, `npm run build`, and `node --test test/*.test.mjs`; the full suite passed with 166 tests and 0 failures.
+- Files changed: `packages/agent-world-sdk/src/identity.ts`, `packages/agent-world-sdk/src/index.ts`, `test/base58.test.mjs`, `.hal/auto-prd.json`, `.hal/progress.txt`
+- **Learnings for future iterations:**
+  - The cleanest way to exercise the codec directly in this repo is a root `node:test` file that imports the built SDK artifact from `packages/agent-world-sdk/dist`, rather than reaching into TypeScript source.
+  - Exporting the codec helper through the SDK surface keeps the regression focused on the compiled implementation and avoids brittle test-only module hacks.
+  - This story did not require an `AGENTS.md` update because the reusable Base58 codec split and regression-shape guidance were already documented there and in the Codebase Patterns section.
+---

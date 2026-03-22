@@ -16,6 +16,7 @@ export {
 export type { AwRequestHeaders, AwResponseHeaders } from "./crypto.js";
 export {
   loadOrCreateIdentity,
+  base58Encode,
   deriveDidKey,
   toPublicKeyMultibase,
 } from "./identity.js";

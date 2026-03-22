@@ -9,7 +9,7 @@ import type { Identity } from "./types.js"
 const MULTICODEC_ED25519_PREFIX = Buffer.from([0xed, 0x01])
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-function base58Encode(buf: Buffer): string {
+export function base58Encode(buf: Buffer): string {
   if (buf.length === 0) return ""
 
   const digits = [0]
