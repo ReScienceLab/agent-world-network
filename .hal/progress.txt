@@ -2,6 +2,7 @@
 
 ## Codebase Patterns
 - For the `compound/fix-sdk-protocol-consistency-bugs` branch, keep non-bookkeeping changes scoped to `packages/agent-world-sdk/src/world-server.ts`, `packages/agent-world-sdk/src/world-ledger.ts`, `packages/agent-world-sdk/src/peer-protocol.ts`, and only the minimal regression files needed to verify those three fixes.
+- For direct SDK handler regressions that the integrated HTTP suites do not hit, prefer a root `node:test` file that imports built `packages/agent-world-sdk/dist` entrypoints and exercises `registerPeerRoutes()` with `fastify.inject()` instead of starting a network listener.
 - For deterministic identity-helper regressions in this branch, use `nacl.sign.keyPair.fromSeed(Buffer.alloc(32, 1))`; its public key is `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=` and it maps to stable literals for both `deriveDidKey()` and `toPublicKeyMultibase()`.
 - For Base58 zero-boundary fixes in this repo, both codec halves need explicit all-zero handling: the encoder must not append the synthetic zero digit after leading `1`s, and the decoder must not retain the synthetic accumulator byte for all-leading-`1` inputs.
 - Direct Base58 boundary regressions in `test/base58.test.mjs` should import compiled helpers from the SDK `dist/` split points: `base58Encode` from `dist/identity.js` and `base58Decode` from `dist/peer-protocol.js`.
@@ -341,4 +342,14 @@
   - This branch should not reopen the already-completed Base58 leading-zero work, world-state recipient restriction and endpoint ownership fixes, or `/peer/key-rotation` binding validation.
   - The scope note belongs in the PRD `notes` field so later iterations can distinguish planned protocol-consistency work from older completed stories in the same progress log.
   - No `AGENTS.md` update was needed here because the reusable branch-scope reminder is sufficient in the consolidated Codebase Patterns section.
+---
+## 2026-03-22 15:06:48 UTC - T-002
+- Reviewed the current tests and source for the three scoped fixes, then recorded the exact existing coverage and gaps in `.hal/auto-prd.json`.
+- Identified that `test/world-state-broadcast.test.mjs` covers recipient routing only, `test/domain-separation.test.mjs` contains the stale world-state-vs-message assumption that must be updated for the signing change, `packages/agent-world-sdk/src/world-ledger.ts` has no direct separator-constant regression, and current `/peer/message` suites do not exercise the `registerPeerRoutes()` callback branch that calls `reply.send()`.
+- Verified the branch stayed green with `npm run build`, `npm --prefix packages/agent-world-sdk run build`, and `node --test test/*.test.mjs`.
+- Files changed: `.hal/auto-prd.json`, `.hal/progress.txt`
+- **Learnings for future iterations:**
+  - The follow-up world-state signing regression should stay narrow: update or replace the existing domain-separation expectation without duplicating the recipient restriction assertions already covered in `test/world-state-broadcast.test.mjs`.
+  - The ledger separator fix needs its own exact-constant assertion against the built SDK artifact because current tests do not read `LEDGER_SEPARATOR` directly anywhere.
+  - The `/peer/message` reply-path regression is best added as a direct SDK route test with `fastify.inject()` because the existing integrated HTTP suites do not expose the callback branch inside `registerPeerRoutes()`.
 ---

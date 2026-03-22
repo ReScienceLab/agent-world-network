@@ -28,8 +28,8 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Reviewed the existing coverage around the three scoped fixes. For world-state signing, `test/world-state-broadcast.test.mjs` currently verifies recipient restriction and endpoint ownership only, while `test/domain-separation.test.mjs` still asserts that a `world.state` signature created with `DOMAIN_SEPARATORS.WORLD_STATE` cannot verify as a regular message, so the message-domain change will require a focused expectation update or replacement there plus a narrow broadcast-oriented regression that stays out of recipient-selection logic. For the ledger separator, `packages/agent-world-sdk/src/world-ledger.ts` still derives `LEDGER_SEPARATOR` from `DOMAIN_SEPARATORS.MESSAGE`, and there is no direct test that asserts the exact canonical constant ``AgentWorld-Ledger-${PROTOCOL_VERSION}\\0`` yet, so a minimal regression can live in a dedicated root `node:test` file that imports the built SDK artifact. For the `/peer/message` callback reply path, existing request-signing, transport-enforcement, and response-signing suites hit `/peer/message` over HTTP, but none exercise `registerPeerRoutes()` with a custom `onMessage` callback that calls `reply.send()`, so the narrowest follow-up is an SDK-level `fastify.inject()` regression alongside the existing direct route tests in `test/key-rotation-sdk.test.mjs` or a similarly focused SDK test file. This planning explicitly avoids duplicating the completed Base58, world-state recipient restriction, and key-rotation binding regressions."
     },
     {
       "id": "T-003",
