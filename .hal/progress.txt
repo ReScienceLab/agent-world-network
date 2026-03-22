@@ -138,3 +138,12 @@
   - A signed `/peer/announce` is sufficient to seed discovery state in the world-members suite, which makes it a good place to verify that membership responses ignore non-joined peers.
   - Full validation remains `npm run build && npm --prefix packages/agent-world-sdk run build && node --test test/*.test.mjs`.
 ---
+## 2026-03-22 14:04:37 UTC - T-009
+- Ran the full repo validation sequence required for this branch: `npm run build`, `npm --prefix packages/agent-world-sdk run build`, and `node --test test/*.test.mjs`.
+- Confirmed the branch changes are green end to end: both builds succeeded and the test suite completed with 157 passing tests and 0 failures.
+- Files changed: `.hal/auto-prd.json`, `.hal/progress.txt`
+- **Learnings for future iterations:**
+  - The repo validation command order in `AGENTS.md` is accurate and sufficient for this area: build the root package first, then the SDK package, then run the Node test suite.
+  - `T-009` did not require an `AGENTS.md` update because it validated existing patterns rather than introducing a new reusable convention.
+  - A clean `git status` before the bookkeeping update is a useful check here because this final story should only add Hal tracking changes after the code and tests are already settled.
+---

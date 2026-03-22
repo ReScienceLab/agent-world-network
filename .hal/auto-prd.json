@@ -126,8 +126,8 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Ran the required full validation sequence from the repo root on 2026-03-22: `npm run build`, `npm --prefix packages/agent-world-sdk run build`, and `node --test test/*.test.mjs`. Both builds succeeded, and the test suite finished with 157 passing tests and 0 failures. The diff under this branch includes the membership-based broadcast recipient selection in `packages/agent-world-sdk/src/world-server.ts` plus regression coverage in `test/world-state-broadcast.test.mjs` and `test/world-members.test.mjs`."
     }
   ]
 }
