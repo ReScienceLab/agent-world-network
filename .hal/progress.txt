@@ -167,3 +167,12 @@
   - The next story's concrete validation call is `agentIdFromPublicKey(newPublicKeyB64)` in the `/peer/key-rotation` handler after multibase decoding and before any state mutation.
   - No `AGENTS.md` update was needed in this iteration because the reusable helper guidance was already documented at the root.
 ---
+## 2026-03-22 14:17:37 UTC - T-003
+- Added a new binding check in `packages/agent-world-sdk/src/peer-protocol.ts` so `/peer/key-rotation` now derives the expected ID from `newPublicKey` and rejects mismatches before the existing success path continues.
+- Verified the change with `npm --prefix packages/agent-world-sdk run build`, `npm run build`, and `node --test test/key-rotation.test.mjs`.
+- Files changed: `packages/agent-world-sdk/src/peer-protocol.ts`, `.hal/auto-prd.json`, `.hal/progress.txt`
+- **Learnings for future iterations:**
+  - The new-key binding check belongs immediately after multibase decoding and the existing old-key binding validation so malformed rotations fail before timestamp/proof processing can reach persistence.
+  - The existing valid-rotation flow remains compatible because `makeRotationBody()` in `test/key-rotation.test.mjs` already pairs `newAgentId` with the ID derived from `newPublicKey`.
+  - No `AGENTS.md` update was needed here because the reusable route-location and helper-reuse guidance was already captured in the root agent guide and Codebase Patterns.
+---
