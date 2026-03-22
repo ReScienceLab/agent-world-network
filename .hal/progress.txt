@@ -260,3 +260,12 @@
   - Because `deriveDidKey()` prepends the nonzero Ed25519 multicodec prefix, its canonical output is unaffected by the leading-zero boundary bug and can be recorded safely before the codec implementation stories land.
   - This fixture-selection story only needs bookkeeping updates plus a TypeScript build check; no `AGENTS.md` update was necessary because the reusable guidance fits the Hal pattern log.
 ---
+## 2026-03-22 14:41:40 UTC - T-003
+- Fixed `base58Encode()` in `packages/agent-world-sdk/src/identity.ts` so all-zero inputs emit only their canonical leading `1` prefixes and no extra synthetic digit.
+- Verified the exact boundary outputs `[0] -> "1"`, `[0,0] -> "11"`, `[0,1] -> "12"`, `[1] -> "2"`, and `[1,0] -> "5R"`, then ran `npm --prefix packages/agent-world-sdk run build`.
+- Files changed: `packages/agent-world-sdk/src/identity.ts`, `.hal/auto-prd.json`, `.hal/progress.txt`
+- **Learnings for future iterations:**
+  - The encoder bug was specific to the all-zero-byte case: the existing loop kept a placeholder zero digit in `digits`, so canonical output needs an early return when every input byte is a leading zero.
+  - For this codec branch, the SDK package build is enough to validate isolated TypeScript changes in `packages/agent-world-sdk/src/identity.ts` before the later regression-test stories land.
+  - This story did not require an `AGENTS.md` update because the reusable cross-file codec guidance was already documented in the root instructions and Codebase Patterns section.
+---

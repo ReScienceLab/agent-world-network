@@ -42,8 +42,8 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Updated `packages/agent-world-sdk/src/identity.ts` so `base58Encode()` returns only the canonical leading `1` prefix sequence when the input is all zero bytes, instead of appending the synthetic zero digit. Verified the boundary cases `[0] -> \"1\"`, `[0,0] -> \"11\"`, `[0,1] -> \"12\"`, `[1] -> \"2\"`, and `[1,0] -> \"5R\"`, and confirmed the SDK TypeScript build still passes."
     },
     {
       "id": "T-004",
