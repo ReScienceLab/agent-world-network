@@ -1,148 +1,148 @@
 {
-  "project": "Fix Base58 Leading-Zero Codec",
-  "branchName": "compound/fix-base58-leading-zero-codec",
-  "description": "Fix the SDK base58 encoder and decoder so leading zero bytes round-trip correctly, preserve canonical outputs for known-good cases, and add focused regression coverage for direct codec behavior plus dependent identity helpers.",
+  "project": "Fix SDK Protocol Consistency Bugs",
+  "branchName": "compound/fix-sdk-protocol-consistency-bugs",
+  "description": "Apply the remaining SDK protocol consistency fixes by aligning world-state signing with the message domain, replacing ledger separator derivation with the canonical versioned constant, making the `/peer/message` callback path explicitly return `reply`, and verifying the scoped changes with targeted regression coverage plus full build and test validation.",
   "userStories": [
     {
       "id": "T-001",
-      "title": "Confirm codec scope and regression inputs",
-      "description": "As a developer, I need the implementation scope and regression inputs confirmed in the relevant SDK and test files so that the fix stays limited to the leading-zero codec bug.",
+      "title": "Confirm scoped files and excluded prior fixes",
+      "description": "As a developer, I need the exact implementation scope confirmed so that the work stays limited to the three known SDK consistency fixes and does not reopen prior protocol fixes.",
       "acceptanceCriteria": [
-        "Implementation work is limited to `packages/agent-world-sdk/src/identity.ts`, `packages/agent-world-sdk/src/peer-protocol.ts`, and affected test files needed for verification.",
-        "The regression inputs `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]` are explicitly represented in the resulting task breakdown or test plan.",
+        "Implementation scope is limited to `packages/agent-world-sdk/src/world-server.ts`, `packages/agent-world-sdk/src/world-ledger.ts`, `packages/agent-world-sdk/src/peer-protocol.ts`, and minimal verification files if required.",
+        "Implementation notes identify the three target changes: world-state message-domain signing, canonical versioned ledger separator construction, and explicit Fastify reply return in `/peer/message`.",
+        "Implementation notes explicitly exclude rework of base58 leading-zero handling, world-state recipient restriction, and key-rotation binding.",
         "Typecheck passes"
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Confirmed scope for the leading-zero codec fix is limited to `packages/agent-world-sdk/src/identity.ts` for `base58Encode`, `packages/agent-world-sdk/src/peer-protocol.ts` for `base58Decode`/`multibaseToBase64`, and affected regression tests under `test/` that import built `dist/` artifacts. Existing broad identity coverage lives in `test/agentid-identity.test.mjs`, but the focused regression plan for this branch is a dedicated `test/base58.test.mjs` covering the explicit byte cases `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]` for encode, decode, and round-trip checks."
+      "notes": "Confirmed the scoped implementation surface for this branch is `packages/agent-world-sdk/src/world-server.ts`, `packages/agent-world-sdk/src/world-ledger.ts`, and `packages/agent-world-sdk/src/peer-protocol.ts`, with only minimal targeted regression files under `test/` if coverage is needed. The three intended changes are: switch `broadcastWorldState()` signing to `DOMAIN_SEPARATORS.MESSAGE`, define `LEDGER_SEPARATOR` directly as `AgentWorld-Ledger-${PROTOCOL_VERSION}\\0`, and explicitly `return reply` after `reply.send()` in the callback-based `/peer/message` path. This scope explicitly excludes reopening the already-handled Base58 leading-zero codec work, world-state recipient restriction and endpoint ownership logic, and `/peer/key-rotation` binding validation."
     },
     {
       "id": "T-002",
-      "title": "Identify deterministic identity helper fixtures",
-      "description": "As a developer, I need a deterministic public-key fixture and fixed expected outputs identified for DID and multibase helpers so that regression tests assert stable literals instead of recomputing expectations.",
+      "title": "Identify minimal regression coverage points",
+      "description": "As a maintainer, I need the existing tests and verification gaps identified up front so that any new coverage stays minimal and targeted to the three scoped fixes.",
       "acceptanceCriteria": [
-        "A deterministic fixture is selected from existing repo coverage or introduced in tests for identity helper assertions.",
-        "Expected `deriveDidKey` and `toPublicKeyMultibase` outputs are recorded as explicit string literals in tests or implementation notes.",
+        "Existing test coverage or verification gaps are identified for world-state signing, ledger separator construction, and `/peer/message` reply handling.",
+        "Any planned new or updated tests are limited to the three scoped fixes.",
+        "Coverage planning explicitly avoids duplicating prior regression tests for base58, recipient restriction, and key-rotation binding.",
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Use a deterministic Ed25519 fixture generated from `nacl.sign.keyPair.fromSeed(Buffer.alloc(32, 1))`. The corresponding seed literal is `AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=` and the derived public key literal is `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=`. Record these explicit expected helper outputs for later regression coverage: `deriveDidKey(pubB64) === \"did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX\"` and `toPublicKeyMultibase(pubB64) === \"z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX\"`."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "T-003",
-      "title": "Fix base58 encoding for leading zero bytes",
-      "description": "As a developer, I need `base58Encode` to emit canonical leading `1` prefixes so that byte arrays with leading zeros preserve their exact binary value when encoded.",
+      "title": "Switch world-state signing to the message domain",
+      "description": "As a developer, I need `broadcastWorldState()` to sign outbound `world.state` payloads with the standard message domain so that peer verification follows the same protocol path as other signed messages.",
       "acceptanceCriteria": [
-        "`base58Encode(Buffer.from([0]))` returns exactly `\"1\"`.",
-        "`base58Encode(Buffer.from([0,0]))` returns exactly `\"11\"`.",
-        "`base58Encode(Buffer.from([0,1]))` returns exactly `\"12\"`.",
-        "`base58Encode(Buffer.from([1]))` returns exactly `\"2\"`.",
-        "`base58Encode(Buffer.from([1,0]))` returns exactly `\"5R\"`.",
+        "`packages/agent-world-sdk/src/world-server.ts` signs `world.state` message bodies with `DOMAIN_SEPARATORS.MESSAGE`.",
+        "`packages/agent-world-sdk/src/world-server.ts` no longer uses `DOMAIN_SEPARATORS.WORLD_STATE` for message-body signing in `broadcastWorldState()`.",
+        "Existing recipient-selection and endpoint-delivery logic in `broadcastWorldState()` remains otherwise unchanged.",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Updated `packages/agent-world-sdk/src/identity.ts` so `base58Encode()` returns only the canonical leading `1` prefix sequence when the input is all zero bytes, instead of appending the synthetic zero digit. Verified the boundary cases `[0] -> \"1\"`, `[0,0] -> \"11\"`, `[0,1] -> \"12\"`, `[1] -> \"2\"`, and `[1,0] -> \"5R\"`, and confirmed the SDK TypeScript build still passes."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "T-004",
-      "title": "Fix base58 decoding for leading one prefixes",
-      "description": "As a developer, I need `base58Decode` to reconstruct leading zero bytes from canonical base58 inputs so that identity-related values decode without corruption.",
+      "title": "Add focused regression coverage for world-state signing",
+      "description": "As a maintainer, I need a targeted regression around `broadcastWorldState()` signing so that the message-domain change is protected without broadening world-state protocol coverage.",
       "acceptanceCriteria": [
-        "`base58Decode(\"1\")` returns exactly `[0]`.",
-        "`base58Decode(\"11\")` returns exactly `[0,0]`.",
-        "`base58Decode(\"12\")` returns exactly `[0,1]`.",
-        "`base58Decode(\"2\")` returns exactly `[1]`.",
-        "`base58Decode(\"5R\")` returns exactly `[1,0]`.",
+        "Existing or new tests verify that `world.state` signatures are produced using the message-domain path expected by peer verification.",
+        "The regression coverage is limited to the signing-domain fix and does not duplicate recipient restriction assertions.",
+        "The regression runs under `node --test test/*.test.mjs` or an existing SDK package test entrypoint used by the repo.",
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Updated `packages/agent-world-sdk/src/peer-protocol.ts` so `base58Decode()` treats all-leading-`1` inputs as pure zero-byte payloads instead of preserving the synthetic accumulator byte. Verified the canonical boundary cases `\"1\" -> [0]`, `\"11\" -> [0,0]`, `\"12\" -> [0,1]`, `\"2\" -> [1]`, and `\"5R\" -> [1,0]`, then re-ran the SDK build plus the full repo build/test sequence successfully."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "T-005",
-      "title": "Add direct encode regression coverage",
-      "description": "As a developer, I need focused encode assertions in a dedicated codec regression test file so that canonical leading-zero outputs are verified independently of broader protocol tests.",
+      "title": "Define the canonical versioned ledger separator",
+      "description": "As a developer, I need `LEDGER_SEPARATOR` to be defined directly from the protocol version so that ledger hashing uses the canonical versioned constant without obsolete derivation logic.",
       "acceptanceCriteria": [
-        "A file `test/base58.test.mjs` exists.",
-        "`test/base58.test.mjs` asserts exact encode results for `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]`.",
-        "The encode assertions import built artifacts rather than source files directly.",
+        "`packages/agent-world-sdk/src/world-ledger.ts` defines `LEDGER_SEPARATOR` as ``AgentWorld-Ledger-${PROTOCOL_VERSION}\\0``.",
+        "`packages/agent-world-sdk/src/world-ledger.ts` imports `PROTOCOL_VERSION` from `./version.js`.",
+        "Obsolete separator derivation logic is removed from `packages/agent-world-sdk/src/world-ledger.ts`.",
+        "`packages/agent-world-sdk/src/world-ledger.ts` removes `DOMAIN_SEPARATORS` from imports if it is otherwise unused.",
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "Verified `test/base58.test.mjs` exists and asserts exact encode results for `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]` by importing `base58Encode` from the built SDK artifact at `packages/agent-world-sdk/dist/identity.js`. Re-ran `npm --prefix packages/agent-world-sdk run build` and `node --test test/base58.test.mjs`; both passed."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "T-006",
-      "title": "Add direct decode and round-trip regression coverage",
-      "description": "As a developer, I need decode and round-trip assertions in the codec regression test file so that the leading-zero boundary cases are validated byte-for-byte in both directions.",
+      "title": "Add focused regression coverage for the ledger separator constant",
+      "description": "As a maintainer, I need a narrow regression around `LEDGER_SEPARATOR` so that the canonical versioned constant remains stable without expanding ledger behavior beyond this fix.",
       "acceptanceCriteria": [
-        "`test/base58.test.mjs` asserts exact decode results for `\"1\"`, `\"11\"`, `\"12\"`, `\"2\"`, and `\"5R\"`.",
-        "`test/base58.test.mjs` includes round-trip assertions for `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]`.",
-        "Each round-trip assertion verifies byte-for-byte equality with the original input.",
+        "Existing or new tests verify that `LEDGER_SEPARATOR` resolves to the exact string ``AgentWorld-Ledger-${PROTOCOL_VERSION}\\0``.",
+        "The regression coverage is limited to separator construction and does not refactor broader ledger hashing behavior.",
+        "The regression runs under the repo's existing build-and-test workflow.",
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "Extended `test/base58.test.mjs` with exact decode assertions for `\"1\"`, `\"11\"`, `\"12\"`, `\"2\"`, and `\"5R\"`, plus byte-for-byte round-trip checks for `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]`. Exported `base58Decode` from `packages/agent-world-sdk/src/peer-protocol.ts` and the SDK index so the regression can import the compiled artifact at `packages/agent-world-sdk/dist/peer-protocol.js`. Verified with `npm --prefix packages/agent-world-sdk run build`, `npm run build`, and `node --test test/*.test.mjs`."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "T-007",
-      "title": "Add deriveDidKey regression coverage",
-      "description": "As a developer, I need deterministic `deriveDidKey` coverage so that the codec fix cannot silently change canonical DID output for known-good inputs.",
+      "title": "Return the Fastify reply explicitly in `/peer/message`",
+      "description": "As a developer, I need the callback path in the `/peer/message` POST handler to explicitly return `reply` after `reply.send()` so that the handler behavior is consistent and unambiguous.",
       "acceptanceCriteria": [
-        "Tests assert `deriveDidKey` returns a fixed expected DID string for the chosen deterministic fixture.",
-        "The expected DID value is written as an explicit literal and is not computed by the function under test.",
-        "The regression coverage lives in `test/base58.test.mjs` or another dedicated identity-focused test file that runs under `node --test test/*.test.mjs`.",
+        "The `/peer/message` POST handler in `packages/agent-world-sdk/src/peer-protocol.ts` explicitly returns `reply` after `reply.send()` in the callback path.",
+        "The success and error callback paths preserve their existing status codes and response payloads.",
+        "The handler update does not modify key-rotation binding logic or base58 codec behavior.",
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
-      "notes": "Extended `test/base58.test.mjs` with a deterministic `deriveDidKey()` assertion that uses the fixed public-key fixture `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=` and the explicit expected DID literal `did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX`. Verified with `npm --prefix packages/agent-world-sdk run build`, `npm run build`, and `node --test test/*.test.mjs`."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "T-008",
-      "title": "Add toPublicKeyMultibase regression coverage",
-      "description": "As a developer, I need deterministic `toPublicKeyMultibase` coverage so that canonical multibase output remains stable after the codec change.",
+      "title": "Add focused regression coverage for the `/peer/message` reply path",
+      "description": "As a maintainer, I need a targeted regression for the callback-based `/peer/message` reply path so that the explicit return stays protected without refactoring unrelated Fastify handlers.",
       "acceptanceCriteria": [
-        "Tests assert `toPublicKeyMultibase` returns a fixed expected multibase string for the chosen deterministic fixture.",
-        "The expected multibase value is written as an explicit literal and is not computed by the function under test.",
-        "The regression coverage runs under `node --test test/*.test.mjs`.",
+        "Existing or new tests exercise the callback-based `/peer/message` path that calls `reply.send()`.",
+        "The coverage verifies that the handler remains successful on the happy path and preserves the existing error response behavior.",
+        "The regression is limited to the explicit reply-return change and does not duplicate base58 or key-rotation coverage.",
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true,
-      "notes": "Extended `test/base58.test.mjs` with a deterministic `toPublicKeyMultibase()` assertion that uses the fixed public-key fixture `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=` and the explicit expected multibase literal `z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX`. Verified with `npm --prefix packages/agent-world-sdk run build`, `npm run build`, and `node --test test/*.test.mjs`."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "T-009",
-      "title": "Verify SDK package build after codec changes",
-      "description": "As a developer, I need the SDK package build to pass after the codec updates so that downstream tests import fresh built artifacts with the fix applied.",
+      "title": "Build the SDK and root packages after the scoped fixes",
+      "description": "As a maintainer, I need both TypeScript build steps to succeed after the protocol consistency changes so that compiled SDK and plugin artifacts remain valid.",
       "acceptanceCriteria": [
         "`npm --prefix packages/agent-world-sdk run build` completes successfully.",
-        "The build output includes the updated codec logic needed by tests.",
+        "`npm run build` completes successfully.",
+        "The builds do not require unrelated source changes outside the scoped fixes and targeted verification updates.",
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": true,
-      "notes": "Ran `npm --prefix packages/agent-world-sdk run build` after the codec and regression-test changes; the SDK TypeScript build completed successfully and confirmed the updated compiled artifacts are available for downstream tests."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "T-010",
-      "title": "Verify root build and test suite",
-      "description": "As a developer, I need the repo build and test workflow to pass with the new regression coverage so that the base58 fix is validated the same way local development and CI expect.",
+      "title": "Run the repository test suite and confirm scoped completion",
+      "description": "As a maintainer, I need the existing repository tests to pass after the batched consistency fixes so that the final change set is validated end to end without reopening prior protocol work.",
       "acceptanceCriteria": [
-        "`npm run build` completes successfully.",
         "`node --test test/*.test.mjs` completes successfully.",
-        "The executed test suite includes `test/base58.test.mjs`.",
+        "Existing coverage for base58 leading-zero handling, world-state recipient restriction, and key-rotation binding continues to pass unchanged unless a scoped expectation update is strictly required.",
+        "The final change set remains limited to the three protocol consistency fixes and their minimal regression coverage.",
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": true,
-      "notes": "Added `test/base58.test.mjs` with exact encode assertions for `[0]`, `[0,0]`, `[0,1]`, `[1]`, and `[1,0]`, importing `base58Encode` from the built SDK artifact at `packages/agent-world-sdk/dist/identity.js`. Exported `base58Encode` from `packages/agent-world-sdk/src/identity.ts` and the SDK index so the regression can exercise the compiled implementation directly."
+      "passes": false,
+      "notes": ""
     }
   ]
 }
