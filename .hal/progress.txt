@@ -1,6 +1,7 @@
 # Ralph Progress Log
 
 ## Codebase Patterns
+- For deterministic identity-helper regressions in this branch, use `nacl.sign.keyPair.fromSeed(Buffer.alloc(32, 1))`; its public key is `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=` and it maps to stable literals for both `deriveDidKey()` and `toPublicKeyMultibase()`.
 - In `packages/agent-world-sdk/src/peer-protocol.ts`, `/peer/key-rotation` validation is authoritative inside `registerPeerRoutes()`, and new key-binding checks should run after multibase decoding but before `peerDb.upsert(...)`.
 - Reuse `agentIdFromPublicKey()` from `packages/agent-world-sdk/src/crypto.ts` for any public-key-to-agent binding check; do not duplicate the derivation logic in route handlers or tests.
 - Repo-level key-rotation tests exercise `dist/peer-server.js`, so whenever the SDK `registerPeerRoutes()` rotation contract changes, mirror the same validation and error payload in `src/peer-server.ts` before relying on `test/key-rotation.test.mjs`.
@@ -249,4 +250,13 @@
   - The encode and decode halves of the SDK Base58 codec do not live together: DID/multibase generation uses `base58Encode` in `packages/agent-world-sdk/src/identity.ts`, while multibase parsing uses `base58Decode` in `packages/agent-world-sdk/src/peer-protocol.ts`.
   - The right regression shape for this bug is a dedicated root test that imports built artifacts and asserts the canonical leading-zero cases directly, rather than inferring correctness only through higher-level identity helpers.
   - This story is planning and scope confirmation only, so the minimal acceptance check is the SDK TypeScript build rather than the full repo test workflow.
+---
+## 2026-03-22 15:12:44 UTC - T-002
+- Selected a deterministic Ed25519 fixture from `nacl.sign.keyPair.fromSeed(Buffer.alloc(32, 1))` and recorded its seed, public key, and fixed helper outputs in `.hal/auto-prd.json` for upcoming regression stories.
+- Added the fixture choice to the consolidated Codebase Patterns section so later Base58 identity-helper tests can reuse the same literals without recomputing expectations.
+- Files changed: `.hal/auto-prd.json`, `.hal/progress.txt`
+- **Learnings for future iterations:**
+  - The all-`0x01` 32-byte seed produces a stable valid Ed25519 public key of `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=` that is suitable for literal DID/multibase assertions.
+  - Because `deriveDidKey()` prepends the nonzero Ed25519 multicodec prefix, its canonical output is unaffected by the leading-zero boundary bug and can be recorded safely before the codec implementation stories land.
+  - This fixture-selection story only needs bookkeeping updates plus a TypeScript build check; no `AGENTS.md` update was necessary because the reusable guidance fits the Hal pattern log.
 ---

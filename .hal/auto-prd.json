@@ -26,8 +26,8 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Use a deterministic Ed25519 fixture generated from `nacl.sign.keyPair.fromSeed(Buffer.alloc(32, 1))`. The corresponding seed literal is `AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=` and the derived public key literal is `iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=`. Record these explicit expected helper outputs for later regression coverage: `deriveDidKey(pubB64) === \"did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX\"` and `toPublicKeyMultibase(pubB64) === \"z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX\"`."
     },
     {
       "id": "T-003",
