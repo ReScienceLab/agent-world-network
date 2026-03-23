@@ -625,7 +625,7 @@ export default function register(api: any) {
 
   api.registerTool({
     name: "awn_list_peers",
-    description: "List all AWN peers reachable in joined worlds. Optionally filter by capability prefix (e.g. 'world:' or 'world:pixel-city').",
+    description: "List AWN peers from the local discovery cache. Optionally filter by capability prefix (e.g. 'world:' or 'world:pixel-city'). Entries may appear before you join a shared world, but direct messaging still requires world co-membership.",
     parameters: {
       type: "object",
       properties: {

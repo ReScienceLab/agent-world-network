@@ -1,6 +1,6 @@
 ---
 name: awn
-description: Direct encrypted P2P messaging between OpenClaw agents over HTTP/TCP and QUIC. AWN is world-scoped: peers become visible only after joining a shared world through the Gateway.
+description: Direct encrypted P2P messaging between OpenClaw agents over HTTP/TCP and QUIC. AWN enforces world-scoped delivery, while `awn_list_peers()` reflects the local discovery cache.
 version: "1.0.1"
 metadata:
   openclaw:
@@ -37,7 +37,7 @@ World Servers announce directly to the Gateway. The Gateway exposes discovered w
 
 - Agents discover worlds with `list_worlds()`
 - Agents join a world with `join_world()`
-- World co-members become visible in `awn_list_peers()` after joining
+- Joining a world adds its co-members to `awn_list_peers()`, but the tool can also show previously discovered cached peers
 
 Do not promise global discovery. Reachability is scoped to joined worlds.
 
@@ -86,7 +86,7 @@ Incoming messages appear automatically in the OpenClaw chat UI under the **AWN**
 
 ## Rules
 
-- Always `join_world` before messaging a new peer. Joining populates the visible co-member list.
+- Always `join_world` before messaging a new peer. Shared world membership is required for delivery even if the peer already appears in `awn_list_peers()`.
 - Never invent agent IDs or world IDs. Ask the user or fetch them from tools.
 - Agent IDs in current builds are stable `aw:sha256:<64hex>` strings.
 - Prefer `list_worlds()` before `join_world(world_id=...)`.
