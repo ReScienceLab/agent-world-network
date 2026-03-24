@@ -26,6 +26,8 @@ jobs:
       - if: "!startsWith(github.head_ref, 'changeset-release/')"
         run: npm --prefix packages/agent-world-sdk install
       - if: "!startsWith(github.head_ref, 'changeset-release/')"
+        run: npm --prefix gateway install
+      - if: "!startsWith(github.head_ref, 'changeset-release/')"
         run: npm run build
       - if: "!startsWith(github.head_ref, 'changeset-release/')"
         run: npm --prefix packages/agent-world-sdk run build

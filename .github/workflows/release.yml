@@ -30,6 +30,7 @@ jobs:
 
       - run: npm ci
       - run: npm --prefix packages/agent-world-sdk install
+      - run: npm --prefix gateway install
       - run: npm run build
       - run: npm --prefix packages/agent-world-sdk run build
       - run: node --test test/*.test.mjs
