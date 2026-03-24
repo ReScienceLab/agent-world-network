@@ -376,6 +376,7 @@ export async function createGatewayApp(opts = {}) {
           worldId,
           agentId: w.agentId,
           name: w.alias || worldId,
+          endpoints: w.endpoints ?? [],
           reachable: w.endpoints?.length > 0,
           lastSeen: w.lastSeen,
         };

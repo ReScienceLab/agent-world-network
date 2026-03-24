@@ -766,17 +766,19 @@ export default function register(api: any) {
       try {
         const resp = await fetch(`${getGatewayUrl()}/worlds`, { signal: AbortSignal.timeout(10_000) })
         if (resp.ok) {
-          const data = await resp.json() as { worlds?: Array<{ worldId: string; agentId: string; name?: string; lastSeen?: number }> }
+          const data = await resp.json() as { worlds?: Array<{ worldId: string; agentId: string; name?: string; endpoints?: Endpoint[]; lastSeen?: number }> }
           for (const w of data.worlds ?? []) {
             if (w.agentId && !registryWorlds.some(rw => rw.agentId === w.agentId)) {
               registryWorlds.push({
                 agentId: w.agentId,
                 alias: w.name,
+                endpoints: w.endpoints ?? [],
                 capabilities: [`world:${w.worldId}`],
                 lastSeen: w.lastSeen ?? Date.now(),
               })
               upsertDiscoveredPeer(w.agentId, "", {
                 alias: w.name,
+                endpoints: w.endpoints ?? [],
                 capabilities: [`world:${w.worldId}`],
                 source: "gateway",
               })
