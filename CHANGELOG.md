@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.0
+
+### Minor Changes
+
+- 87ad9d1: Add world manifest endpoint and CLI command to query world information and available actions without joining
+
+### Patch Changes
+
+- 79ce791: Fix version-dependent Rust CLI test failures and release-cli workflow trigger
+- dc3d3c2: Fix install.sh, implement `awn daemon stop` with IPC shutdown + PID fallback
+
 ## 1.4.0
 
 ### Minor Changes
