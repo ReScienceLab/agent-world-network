@@ -104,6 +104,10 @@ export function upsertDiscoveredAgent(
     capabilities?: string[]
   } = {}
 ): void {
+  if (opts.capabilities?.some((cap) => cap.startsWith("world:"))) {
+    return
+  }
+
   const now = Date.now()
   const existing = store.agents[agentId]
   if (existing) {

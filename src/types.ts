@@ -66,6 +66,21 @@ export interface DiscoveredAgentRecord extends AgentRecord {
   version?: string
 }
 
+// ── World record types ──────────────────────────────────────────────────────
+
+export interface WorldRecord {
+  worldId: string
+  slug: string
+  publicKey: string
+  endpoints: Endpoint[]
+  lastSeen: number
+}
+
+export interface DiscoveredWorldRecord extends WorldRecord {
+  source: "gateway" | "gossip" | "manual"
+  discoveredVia?: string
+}
+
 // ── Plugin config ───────────────────────────────────────────────────────────
 
 export interface PluginConfig {

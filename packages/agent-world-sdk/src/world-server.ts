@@ -85,6 +85,7 @@ export async function createWorldServer(
   const resolvedPublicPort = publicPort ?? port;
 
   const identity = loadOrCreateIdentity(dataDir, "world-identity");
+  const protocolWorldId = identity.agentId
   console.log(
     `[world] agentId=${identity.agentId} world=${worldId} name="${worldName}"`
   );
@@ -132,7 +133,8 @@ export async function createWorldServer(
       ? { name: cardName ?? worldName, description: cardDescription, cardUrl }
       : undefined,
     pingExtra: () => ({
-      worldId,
+      worldId: protocolWorldId,
+      slug: worldId,
       worldName,
       agents: agentLastSeen.size,
       ...(maxAgents ? { maxAgents } : {}),
@@ -163,7 +165,8 @@ export async function createWorldServer(
           ledger.append("world.join", agentId, alias || undefined);
           sendReply({
             ok: true,
-            worldId,
+            worldId: protocolWorldId,
+            slug: worldId,
             manifest: buildManifest(result.manifest),
             state: result.state,
             members: getMembers(agentId),
@@ -358,6 +361,7 @@ export async function createWorldServer(
     stopAnnounce = await startGatewayAnnounce({
       identity,
       alias: worldName,
+      slug: worldId,
       publicAddr,
       publicPort: resolvedPublicPort,
       capabilities: [`world:${worldId}`],

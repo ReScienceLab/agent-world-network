@@ -15,6 +15,14 @@ export interface AgentRecord {
   lastSeen: number
 }
 
+export interface WorldRecord {
+  worldId: string
+  slug: string
+  publicKey: string
+  endpoints: Endpoint[]
+  lastSeen: number
+}
+
 export interface Identity {
   agentId: string
   pubB64: string

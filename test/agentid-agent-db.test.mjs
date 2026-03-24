@@ -172,20 +172,20 @@ describe("peer-db (agentId-keyed)", () => {
 describe("findAgentsByCapability", () => {
   it("exact match returns peer with that capability", () => {
     const id = generateIdentity()
-    upsertDiscoveredAgent(id.agentId, id.publicKey, { capabilities: ["world:pixel-city"] })
-    const results = findAgentsByCapability("world:pixel-city")
+    upsertDiscoveredAgent(id.agentId, id.publicKey, { capabilities: ["chat:dm"] })
+    const results = findAgentsByCapability("chat:dm")
     assert.equal(results.length, 1)
     assert.equal(results[0].agentId, id.agentId)
   })
 
-  it("prefix match returns all world:* peers", () => {
+  it("prefix match returns all chat:* peers", () => {
     const a = generateIdentity()
     const b = generateIdentity()
     const c = generateIdentity()
-    upsertDiscoveredAgent(a.agentId, a.publicKey, { capabilities: ["world:pixel-city"] })
-    upsertDiscoveredAgent(b.agentId, b.publicKey, { capabilities: ["world:dungeon"] })
+    upsertDiscoveredAgent(a.agentId, a.publicKey, { capabilities: ["chat:dm"] })
+    upsertDiscoveredAgent(b.agentId, b.publicKey, { capabilities: ["chat:group"] })
     upsertDiscoveredAgent(c.agentId, c.publicKey, { capabilities: ["chat"] })
-    const results = findAgentsByCapability("world:")
+    const results = findAgentsByCapability("chat:")
     assert.equal(results.length, 2)
     assert.ok(results.some((p) => p.agentId === a.agentId))
     assert.ok(results.some((p) => p.agentId === b.agentId))
@@ -194,12 +194,18 @@ describe("findAgentsByCapability", () => {
   it("returns empty array when no match", () => {
     const id = generateIdentity()
     upsertDiscoveredAgent(id.agentId, id.publicKey, { capabilities: ["chat"] })
+    assert.deepEqual(findAgentsByCapability("chat:"), [])
+  })
+
+  it("world capabilities are ignored in agent db", () => {
+    const id = generateIdentity()
+    upsertDiscoveredAgent(id.agentId, id.publicKey, { capabilities: ["world:pixel-city"] })
     assert.deepEqual(findAgentsByCapability("world:"), [])
   })
 
   it("peer with no capabilities is not matched", () => {
     const id = generateIdentity()
     upsertDiscoveredAgent(id.agentId, id.publicKey, {})
-    assert.deepEqual(findAgentsByCapability("world:"), [])
+    assert.deepEqual(findAgentsByCapability("chat:"), [])
   })
 })

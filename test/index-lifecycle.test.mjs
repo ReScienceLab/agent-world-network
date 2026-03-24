@@ -8,6 +8,7 @@ const MODULE_IDS = [
   "../dist/index.js",
   "../dist/identity.js",
   "../dist/agent-db.js",
+  "../dist/world-db.js",
   "../dist/agent-server.js",
   "../dist/agent-client.js",
   "../dist/channel.js",
@@ -33,6 +34,7 @@ function createHarness({
   const childProcess = require("node:child_process")
   const identityMod = require("../dist/identity.js")
   const agentDbMod = require("../dist/agent-db.js")
+  const worldDbMod = require("../dist/world-db.js")
   const agentServerMod = require("../dist/agent-server.js")
   const agentClientMod = require("../dist/agent-client.js")
   const channelMod = require("../dist/channel.js")
@@ -40,6 +42,7 @@ function createHarness({
   const transportQuicMod = require("../dist/transport-quic.js")
 
   const agents = new Map()
+  const worlds = new Map()
   const sendCalls = []
   const gatewayMessages = []
   const timers = new Map()
@@ -60,6 +63,12 @@ function createHarness({
     findAgentsByCapability: agentDbMod.findAgentsByCapability,
     upsertDiscoveredAgent: agentDbMod.upsertDiscoveredAgent,
     removeAgent: agentDbMod.removeAgent,
+    initWorldDb: worldDbMod.initWorldDb,
+    listWorlds: worldDbMod.listWorlds,
+    getWorld: worldDbMod.getWorld,
+    getWorldBySlug: worldDbMod.getWorldBySlug,
+    upsertWorld: worldDbMod.upsertWorld,
+    flushWorldDb: worldDbMod.flushWorldDb,
     startAgentServer: agentServerMod.startAgentServer,
     stopAgentServer: agentServerMod.stopAgentServer,
     setSelfMeta: agentServerMod.setSelfMeta,
@@ -115,6 +124,33 @@ function createHarness({
   agentDbMod.removeAgent = (agentId) => {
     agents.delete(agentId)
   }
+
+  worldDbMod.initWorldDb = () => {}
+  worldDbMod.listWorlds = () => [...worlds.values()]
+  worldDbMod.getWorld = (worldId) => worlds.get(worldId) ?? null
+  worldDbMod.getWorldBySlug = (slug) =>
+    [...worlds.values()].find((world) => world.slug === slug) ?? null
+  worldDbMod.upsertWorld = (worldId, opts = {}) => {
+    const existing = worlds.get(worldId) ?? {
+      worldId,
+      slug: worldId,
+      publicKey: "",
+      endpoints: [],
+      lastSeen: 0,
+      source: "gossip",
+    }
+    worlds.set(worldId, {
+      ...existing,
+      ...opts,
+      worldId,
+      slug: opts.slug ?? existing.slug,
+      publicKey: opts.publicKey ?? existing.publicKey,
+      endpoints: opts.endpoints ?? existing.endpoints,
+      lastSeen: opts.lastSeen ?? Date.now(),
+      source: opts.source ?? existing.source,
+    })
+  }
+  worldDbMod.flushWorldDb = () => {}
 
   agentServerMod.startAgentServer = async () => {}
   agentServerMod.stopAgentServer = async () => {}
@@ -202,6 +238,7 @@ function createHarness({
 
   return {
     agents,
+    worlds,
     agentServer: agentServerMod,
     sendCalls,
     gatewayMessages,
@@ -235,6 +272,12 @@ function createHarness({
       agentDbMod.findAgentsByCapability = originals.findAgentsByCapability
       agentDbMod.upsertDiscoveredAgent = originals.upsertDiscoveredAgent
       agentDbMod.removeAgent = originals.removeAgent
+      worldDbMod.initWorldDb = originals.initWorldDb
+      worldDbMod.listWorlds = originals.listWorlds
+      worldDbMod.getWorld = originals.getWorld
+      worldDbMod.getWorldBySlug = originals.getWorldBySlug
+      worldDbMod.upsertWorld = originals.upsertWorld
+      worldDbMod.flushWorldDb = originals.flushWorldDb
       agentServerMod.startAgentServer = originals.startAgentServer
       agentServerMod.stopAgentServer = originals.stopAgentServer
       agentServerMod.setSelfMeta = originals.setSelfMeta
@@ -295,18 +338,18 @@ describe("plugin lifecycle", () => {
       const joinCall = harness.sendCalls.find((call) => call.event === "world.join")
       assert.equal(joinCall?.targetAddr, "203.0.113.10")
 
-      const worldAgent = harness.agents.get(worldAgentId)
-      assert.ok(worldAgent)
-      assert.deepEqual(worldAgent.endpoints, [
+      const worldRecord = harness.worlds.get(worldAgentId)
+      assert.ok(worldRecord)
+      assert.deepEqual(worldRecord.endpoints, [
         { transport: "tcp", address: "203.0.113.10", port: 9000, priority: 1, ttl: 3600 },
       ])
-      assert.deepEqual(worldAgent.capabilities, ["world:arena"])
+      assert.equal(worldRecord.slug, "arena")
 
       await harness.service.stop()
 
       const leaveCall = harness.sendCalls.find((call) => call.event === "world.leave")
       assert.equal(leaveCall?.targetAddr, "203.0.113.10")
-      assert.deepEqual(leaveCall?.opts?.endpoints, worldAgent.endpoints)
+      assert.deepEqual(leaveCall?.opts?.endpoints, undefined)
     } finally {
       harness.restore()
     }
@@ -332,21 +375,19 @@ describe("plugin lifecycle", () => {
             ok: true,
             status: 200,
             json: async () => ({
-              worlds: [{ worldId: "arena", agentId: worldAgentId, name: "Arena", endpoints: [worldEndpoint] }],
+              worlds: [{ worldId: worldAgentId, slug: "arena", endpoints: [worldEndpoint] }],
             }),
           }
         }
-        if (requestUrl.endsWith("/worlds/arena")) {
+        if (requestUrl.endsWith(`/worlds/${encodeURIComponent(worldAgentId)}`)) {
           return {
             ok: true,
             status: 200,
             json: async () => ({
-              world: {
-                agentId: worldAgentId,
-                name: "Arena",
-                publicKey: worldPublicKey,
-                endpoints: [worldEndpoint],
-              },
+              worldId: worldAgentId,
+              slug: "arena",
+              publicKey: worldPublicKey,
+              endpoints: [worldEndpoint],
             }),
           }
         }
@@ -361,9 +402,9 @@ describe("plugin lifecycle", () => {
       const listed = await listWorlds.execute("tool-list", {})
       assert.equal(listed.isError, undefined)
 
-      const discoveredAgent = harness.agents.get(worldAgentId)
-      assert.ok(discoveredAgent, "peer should be discovered after list_worlds")
-      assert.deepEqual(discoveredAgent.endpoints, [worldEndpoint], "endpoints should be populated from /worlds")
+      const discoveredWorld = harness.worlds.get(worldAgentId)
+      assert.ok(discoveredWorld, "world should be discovered after list_worlds")
+      assert.deepEqual(discoveredWorld.endpoints, [worldEndpoint], "endpoints should be populated from /worlds")
 
       const joinWorld = harness.tools.get("join_world")
       const joined = await joinWorld.execute("tool-join", { world_id: "arena" })
@@ -371,12 +412,12 @@ describe("plugin lifecycle", () => {
 
       const joinCall = harness.sendCalls.find((call) => call.event === "world.join")
       assert.equal(joinCall?.targetAddr, "203.0.113.10")
-      assert.ok(harness.fetchCalls.some(([requestUrl]) => String(requestUrl).endsWith("/worlds/arena")))
+      assert.ok(harness.fetchCalls.some(([requestUrl]) => String(requestUrl).endsWith(`/worlds/${encodeURIComponent(worldAgentId)}`)))
 
-      const worldAgent = harness.agents.get(worldAgentId)
-      assert.ok(worldAgent)
-      assert.equal(worldAgent.publicKey, worldPublicKey)
-      assert.deepEqual(worldAgent.endpoints, [worldEndpoint])
+      const worldRecord = harness.worlds.get(worldAgentId)
+      assert.ok(worldRecord)
+      assert.equal(worldRecord.publicKey, worldPublicKey)
+      assert.deepEqual(worldRecord.endpoints, [worldEndpoint])
     } finally {
       harness.restore()
     }
@@ -425,7 +466,7 @@ describe("plugin lifecycle", () => {
       await harness.runIntervals()
       assert.equal(refreshCalls, 1)
       assert.equal(harness.agents.get("aw:sha256:member-1"), undefined)
-      assert.ok(harness.agents.get(worldAgentId))
+      assert.ok(harness.worlds.get(worldAgentId))
 
       await harness.runIntervals()
       assert.equal(refreshCalls, 1)
@@ -577,10 +618,13 @@ describe("world_action tool", () => {
   })
 
   it("rejects ambiguous world_id when multiple worlds are joined", async () => {
-    const worldAgentId = "aw:sha256:world-host"
+    const worldByAddress = {
+      "203.0.113.10": "aw:sha256:world-host-1",
+      "203.0.113.11": "aw:sha256:world-host-2",
+    }
     let joinCount = 0
     const harness = createHarness({
-      pingInfo: { ok: true, data: { agentId: worldAgentId, publicKey: MOCK_WORLD_PUB } },
+      pingInfo: { ok: true, data: { agentId: worldByAddress["203.0.113.10"], publicKey: MOCK_WORLD_PUB } },
       joinResponse: {
         ok: true,
         data: {
@@ -593,7 +637,12 @@ describe("world_action tool", () => {
 
     // Override sendP2PMessage to return different worldIds
     const agentClientMod = createRequire(import.meta.url)("../dist/agent-client.js")
+    const origPing = agentClientMod.getAgentPingInfo
     const origSend = agentClientMod.sendP2PMessage
+    agentClientMod.getAgentPingInfo = async (targetAddr) => ({
+      ok: true,
+      data: { agentId: worldByAddress[targetAddr], publicKey: MOCK_WORLD_PUB },
+    })
     agentClientMod.sendP2PMessage = async (_identity, targetAddr, event, content, port, timeoutMs, opts) => {
       harness.sendCalls.push({ targetAddr, event, content, port, timeoutMs, opts })
       if (event === "world.join") {
@@ -615,7 +664,7 @@ describe("world_action tool", () => {
 
       const joinWorld = harness.tools.get("join_world")
       await joinWorld.execute("t-1", { address: "203.0.113.10:9000" })
-      await joinWorld.execute("t-2", { address: "203.0.113.10:9001" })
+      await joinWorld.execute("t-2", { address: "203.0.113.11:9001" })
 
       const worldAction = harness.tools.get("world_action")
       const result = await worldAction.execute("t-3", { action: "say" })
@@ -624,6 +673,7 @@ describe("world_action tool", () => {
       assert.ok(result.content[0].text.includes("Multiple worlds"))
       assert.ok(result.content[0].text.includes("Specify world_id"))
     } finally {
+      agentClientMod.getAgentPingInfo = origPing
       agentClientMod.sendP2PMessage = origSend
       harness.restore()
     }

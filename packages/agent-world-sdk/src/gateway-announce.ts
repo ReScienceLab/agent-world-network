@@ -12,6 +12,7 @@ const DEFAULT_GATEWAY_URL = "http://localhost:8100";
 export interface AnnounceOpts {
   identity: Identity;
   alias: string;
+  slug?: string;
   version?: string;
   publicAddr: string | null;
   publicPort: number;
@@ -26,6 +27,7 @@ export async function announceToGateway(
   const {
     identity,
     alias,
+    slug,
     version,
     publicAddr,
     publicPort,
@@ -51,6 +53,7 @@ export async function announceToGateway(
     from: identity.agentId,
     publicKey: identity.pubB64,
     alias,
+    ...(slug ? { slug } : {}),
     version: version ?? "1.0.0",
     endpoints,
     capabilities,
@@ -180,8 +183,8 @@ export async function startGatewayAnnounce(opts: GatewayAnnounceOpts): Promise<(
     onDiscovery?.(opts.agentDb.size);
   }
 
-  const worldCap = opts.capabilities.find((c) => c.startsWith("world:"));
-  const worldId = worldCap ? worldCap.slice("world:".length) : undefined;
+  const isWorldServer = opts.capabilities.some((c) => c.startsWith("world:"));
+  const worldId = isWorldServer ? opts.identity.agentId : undefined;
 
   async function runHeartbeat() {
     const results = await Promise.allSettled(
