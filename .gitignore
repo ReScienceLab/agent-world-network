@@ -31,3 +31,4 @@ animation/out/
 .hal/*
 !.hal/standards/
 !.hal/commands/
+packages/awn-cli/target/

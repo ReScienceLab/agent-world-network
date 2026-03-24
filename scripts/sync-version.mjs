@@ -17,6 +17,15 @@ const sdkPkg = JSON.parse(readFileSync('packages/agent-world-sdk/package.json', 
 sdkPkg.version = version
 writeFileSync('packages/agent-world-sdk/package.json', JSON.stringify(sdkPkg, null, 2) + '\n')
 
+// Sync awn Cargo.toml version
+import { existsSync } from 'fs'
+const cargoPath = 'packages/awn-cli/Cargo.toml'
+if (existsSync(cargoPath)) {
+  let cargo = readFileSync(cargoPath, 'utf8')
+  cargo = cargo.replace(/^version = ".*"/m, `version = "${version}"`)
+  writeFileSync(cargoPath, cargo)
+}
+
 if (gatewayUrl) {
   let indexTs = readFileSync('src/index.ts', 'utf8')
   indexTs = indexTs.replace(/(process\.env\.GATEWAY_URL \?\? ")[^"]*"/, `$1${gatewayUrl}"`)
@@ -31,4 +40,4 @@ if (gatewayUrl) {
   writeFileSync('docs/index.html', docsHtml)
 }
 
-console.log(`Synced version ${version} → openclaw.plugin.json, skills/awn/SKILL.md, packages/agent-world-sdk/package.json${gatewayUrl ? `, src/index.ts, web/client.js, docs/index.html (gatewayUrl: ${gatewayUrl})` : ''}`)
+console.log(`Synced version ${version} → openclaw.plugin.json, skills/awn/SKILL.md, packages/agent-world-sdk/package.json, packages/awn-cli/Cargo.toml${gatewayUrl ? `, src/index.ts, web/client.js, docs/index.html (gatewayUrl: ${gatewayUrl})` : ''}`)

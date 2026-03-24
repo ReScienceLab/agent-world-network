@@ -192,8 +192,9 @@ No manual version bumping, no release scripts, no backmerge.
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `release.yml` | Push to `main`, `workflow_dispatch` | Changesets: create Version PR or publish npm + GH Release + ClawHub |
+| `release-cli.yml` | GH Release published, `workflow_dispatch` | Cross-compile Rust `awn` binary (linux-x64, darwin-x64, darwin-arm64), attach to release |
 | `publish.yml` | `workflow_dispatch` only | Emergency manual npm publish |
-| `test.yml` | Push/PR to `main`, `workflow_dispatch` | Build + test (Node 20+22) |
+| `test.yml` | Push/PR to `main`, `workflow_dispatch` | Build + test (Node 20+22) + Rust cargo test |
 | `changeset-check.yml` | PR to `main` | Ensure changeset present + validate packages |
 | `auto-close-issues.yml` | PR merged | Close linked issues |
 
@@ -235,6 +236,7 @@ No `develop` branch. No backmerge.
 | `package-lock.json` | `"version"` (auto-updated) |
 | `openclaw.plugin.json` | `"version"` |
 | `skills/awn/SKILL.md` | `version:` in YAML frontmatter |
+| `packages/awn-cli/Cargo.toml` | `version` (also derives `PROTOCOL_VERSION` at compile time) |
 
 ### Versioning
 
@@ -276,6 +278,7 @@ These files must always have matching versions (synced automatically by `scripts
 | `package-lock.json` | `"version"` (auto-updated by `npm version`) |
 | `openclaw.plugin.json` | `"version"` |
 | `skills/awn/SKILL.md` | `version:` in YAML frontmatter |
+| `packages/awn-cli/Cargo.toml` | `version` (also derives `PROTOCOL_VERSION` at compile time) |
 
 ### Versioning
 

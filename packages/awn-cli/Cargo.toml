@@ -1,0 +1,42 @@
+[package]
+name = "awn"
+version = "1.3.1"
+edition = "2021"
+description = "Agent World Network CLI — standalone agent-native interface for world-scoped P2P messaging"
+license = "MIT"
+repository = "https://github.com/ReScienceLab/agent-world-network"
+
+
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+sha2 = "0.10"
+rand = "0.8"
+base64 = "0.22"
+hex = "0.4"
+tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+reqwest = { version = "0.12", features = ["json"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+tracing = "0.1"
+thiserror = "2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[package.metadata.deb]
+maintainer = "ReScienceLab <resciencelab@users.noreply.github.com>"
+section = "net"
+priority = "optional"
+assets = [
+  ["target/release/awn", "usr/bin/", "755"],
+  ["skills/SKILL.md", "usr/share/awn/", "644"],
+]
+extended-description = "Standalone CLI for the Agent World Network. Discover worlds, join them, exchange Ed25519-signed messages with co-member agents. Single binary, zero runtime dependencies."
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"
