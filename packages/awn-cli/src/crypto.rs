@@ -1,5 +1,6 @@
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -142,6 +143,161 @@ pub fn verify_with_domain_separator(
 pub fn compute_content_digest(body: &str) -> String {
     let hash = Sha256::digest(body.as_bytes());
     format!("sha-256=:{}:", B64.encode(hash))
+}
+
+/// The six AgentWorld HTTP request headers returned by `sign_http_request`.
+pub struct HttpRequestHeaders {
+    pub version: String,
+    pub from_agent: String,
+    pub key_id: String,
+    pub timestamp: String,
+    pub content_digest: String,
+    pub signature: String,
+}
+
+/// Build and sign the AgentWorld request headers for an outbound HTTP call.
+/// Wire-compatible with the TS `signHttpRequest()`.
+pub fn sign_http_request(
+    identity: &crate::identity::Identity,
+    method: &str,
+    authority: &str,
+    path: &str,
+    body: &str,
+) -> HttpRequestHeaders {
+    let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, false);
+    let kid = "#identity";
+    let content_digest = compute_content_digest(body);
+    let signing_input = serde_json::json!({
+        "v": PROTOCOL_VERSION,
+        "from": identity.agent_id,
+        "kid": kid,
+        "ts": ts,
+        "method": method.to_uppercase(),
+        "authority": authority,
+        "path": path,
+        "contentDigest": content_digest,
+    });
+    let signature =
+        sign_with_domain_separator(SEPARATOR_HTTP_REQUEST, &signing_input, &identity.signing_key);
+    HttpRequestHeaders {
+        version: PROTOCOL_VERSION.to_string(),
+        from_agent: identity.agent_id.clone(),
+        key_id: kid.to_string(),
+        timestamp: ts,
+        content_digest,
+        signature,
+    }
+}
+
+/// Build a signed P2P message payload ready for POST to `/peer/message`.
+pub fn build_signed_p2p_message(
+    identity: &crate::identity::Identity,
+    event: &str,
+    content: &str,
+) -> serde_json::Value {
+    let timestamp = now_ms_unix();
+    let payload_without_sig = serde_json::json!({
+        "from": identity.agent_id,
+        "publicKey": identity.pub_b64,
+        "event": event,
+        "content": content,
+        "timestamp": timestamp,
+    });
+    let signature = sign_with_domain_separator(
+        SEPARATOR_MESSAGE,
+        &payload_without_sig,
+        &identity.signing_key,
+    );
+    let mut msg = payload_without_sig;
+    msg["signature"] = serde_json::Value::String(signature);
+    msg
+}
+
+fn now_ms_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
+
+const MAX_CLOCK_SKEW_MS: u64 = 5 * 60 * 1000;
+
+/// The AgentWorld HTTP response headers produced by `sign_http_response`.
+pub struct HttpResponseHeaders {
+    pub version: String,
+    pub from_agent: String,
+    pub key_id: String,
+    pub timestamp: String,
+    pub content_digest: String,
+    pub signature: String,
+}
+
+/// Sign an outbound HTTP response. Wire-compatible with TS `signHttpResponse()`.
+pub fn sign_http_response(
+    identity: &crate::identity::Identity,
+    status: u16,
+    body: &str,
+) -> HttpResponseHeaders {
+    let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, false);
+    let kid = "#identity";
+    let content_digest = compute_content_digest(body);
+    let signing_input = serde_json::json!({
+        "v": PROTOCOL_VERSION,
+        "from": identity.agent_id,
+        "kid": kid,
+        "ts": ts,
+        "status": status,
+        "contentDigest": content_digest,
+    });
+    let signature = sign_with_domain_separator(
+        SEPARATOR_HTTP_RESPONSE,
+        &signing_input,
+        &identity.signing_key,
+    );
+    HttpResponseHeaders {
+        version: PROTOCOL_VERSION.to_string(),
+        from_agent: identity.agent_id.clone(),
+        key_id: kid.to_string(),
+        timestamp: ts,
+        content_digest,
+        signature,
+    }
+}
+
+/// Verify an inbound signed HTTP response. Returns false on any failure.
+/// Wire-compatible with TS `verifyHttpResponseHeaders()`.
+pub fn verify_http_response(
+    version: &str,
+    from: &str,
+    key_id: &str,
+    timestamp: &str,
+    content_digest_header: &str,
+    signature: &str,
+    status: u16,
+    body: &str,
+    public_key_b64: &str,
+) -> bool {
+    if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(timestamp) {
+        let skew = now_ms_unix().abs_diff(ts.timestamp_millis() as u64);
+        if skew > MAX_CLOCK_SKEW_MS {
+            return false;
+        }
+    } else {
+        return false;
+    }
+    if compute_content_digest(body) != content_digest_header {
+        return false;
+    }
+    let signing_input = serde_json::json!({
+        "v": version,
+        "from": from,
+        "kid": key_id,
+        "ts": timestamp,
+        "status": status,
+        "contentDigest": content_digest_header,
+    });
+    verify_with_domain_separator(SEPARATOR_HTTP_RESPONSE, public_key_b64, &signing_input, signature)
+        .unwrap_or(false)
 }
 
 #[derive(Debug, thiserror::Error)]
