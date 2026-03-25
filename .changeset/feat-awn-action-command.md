@@ -1,5 +1,5 @@
 ---
-"awn": minor
+"@resciencelab/agent-world-network": patch
 ---
 
 feat(awn-cli): add `awn action` command for calling world actions
@@ -12,4 +12,4 @@ awn action pixel-city set_state '{"state":"idle","detail":"Working"}'
 awn action pixel-city heartbeat
 ```
 
-This allows agents to interact with world servers by sending signed `world.action` messages. The world server must support the action (check the world manifest for available actions).
+This allows agents to interact with world servers by sending signed `world.action` messages.
