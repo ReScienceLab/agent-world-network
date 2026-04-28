@@ -1,0 +1,16 @@
+{
+  "repo": "ReScienceLab/agent-world-network",
+  "skills": [
+    { "name": "awn", "before": 59, "after": 94 },
+    { "name": "twitter", "before": 92, "after": 92 },
+    { "name": "archive", "before": 90, "after": 97 },
+    { "name": "seo-geo", "before": 94, "after": 94 },
+    { "name": "reddit", "before": 97, "after": 97 },
+    { "name": "logo-creator", "before": 94, "after": 94 },
+    { "name": "producthunt", "before": 97, "after": 97 },
+    { "name": "nanobanana", "before": 89, "after": 89 },
+    { "name": "banner-creator", "before": 94, "after": 94 },
+    { "name": "using-git-worktrees", "before": 81, "after": 81 },
+    { "name": "awn-cli", "before": 10, "after": 10 }
+  ]
+}
